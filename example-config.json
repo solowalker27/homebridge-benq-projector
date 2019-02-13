@@ -1,0 +1,11 @@
+{
+ "bridge": {
+   ...
+},
+ "accessories": [{
+      "accessory": "BenQProjector",
+      "name": "BenQ w1070",
+      "model": "W1070",
+      "adapter": "/dev/ttyUSB0"
+    }]
+}

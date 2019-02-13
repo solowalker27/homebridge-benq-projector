@@ -1,0 +1,38 @@
+{
+  "name": "homebridge-benq-projector",
+  "version": "0.0.1",
+  "description": "Homebridge plugin for BenQ projectors",
+  "main": "index.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/solowalker27/homebridge-benq-projector.git"
+  },
+  "author": "solowalker27 (https://github.com/solowalker27/homebridge-benq-projector)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/solowalker27/homebridge-benq-projector/issues"
+  },
+  "homepage": "https://github.com/solowalker27/homebridge-benq-projector#readme",
+  "keywords": [
+    "benq",
+    "projector",
+    "homebridge",
+    "homebridge-plugin",
+    "plugin",
+    "tv",
+    "w1070",
+    "rs232",
+    "serial"
+  ],
+  "engines": {
+    "node": "^10.10.0",
+    "homebridge": "^0.4.46"
+  },
+  "dependencies": {
+    "serialport": "^6.2.0"
+  }
+}
