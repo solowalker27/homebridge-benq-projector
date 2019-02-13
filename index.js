@@ -78,10 +78,10 @@ function BenQProjector(log, config) {
     this.serialPort.pipe(parser);
     
     parser.on('data', function(data) {
-      this.log("Received data: " + data);
+      this.log.info("Received data: " + data);
       this.serialPort.close(function(error) {
-        this.log("Closing connection");
-        if(error) this.log("Error when closing connection: " + error)
+        this.log.debug("Closing connection");
+        if(error) this.log.error("Error when closing connection: " + error)
         var callback;
         if(this.callbackQueue.length) callback = this.callbackQueue.shift()
           if(callback) callback(data,0);
@@ -108,21 +108,21 @@ BenQProjector.prototype = {
     },
         
     sendCommand: function(command, callback) {
-        this.log("serialPort.open");
+        this.log.info("serialPort.open");
         if(this.serialPort.isOpen){
-            this.log("serialPort is already open...");
+            this.log.debug("serialPort is already open...");
             if(callback) callback(0,1);
         }
         else{
             this.serialPort.open(function (error) {
                              if(error) {
-                                this.log("Error when opening serialport: " + error);
+                                this.log.error("Error when opening serialport: " + error);
                                 if(callback) callback(0,error);
                              }
                              else {
                                  if(callback) this.callbackQueue.push(callback);
                                  this.serialPort.write(command, function(err) {
-                                                   if(err) this.log("Write error = " + err);
+                                                   if(err) this.log.error("Write error = " + err);
                                                    //this.serialPort.drain();
                                                    }.bind(this));
                              }
@@ -147,11 +147,11 @@ BenQProjector.prototype = {
     getPowerState: function(callback) {
         var cmd = this.commands['Power State'];
         
-        this.log("getPowerState");
+        this.log.debug("getPowerState");
         
         this.exec(cmd, function(response,error) {
                   
-                  this.log("Power state is: " + response);
+                  this.log.debug("Power state is: " + response);
                   if (response && response.indexOf("*POW=ON#") > -1) {
                   if(callback) callback(null, true);
                   }
@@ -167,20 +167,20 @@ BenQProjector.prototype = {
         
         if (powerOn) {
             cmd = this.commands['Power On'];
-            this.log("Set", this.name, "to on");
+            this.log.info("Set", this.name, "to on");
         }
         else {
             cmd = this.commands['Power Off'];
-            this.log("Set", this.name, "to off");
+            this.log.info("Set", this.name, "to off");
         }
 
         this.exec(cmd, function(response,error) {
                   if (error) {
-                  this.log('Serial power function failed: %s');
+                  this.log.error('Serial power function failed: %s');
                   if(callback) callback(error);
                   }
                   else {
-                  this.log('Serial power function succeeded!');
+                  this.log.debug('Serial power function succeeded!');
                   if(callback) callback();
                   }
                   }.bind(this));
@@ -191,7 +191,7 @@ BenQProjector.prototype = {
         
         this.exec(cmd, function(response, error) {
                   
-                  this.log("Mute state is:", response);
+                  this.log.info("Mute state is:", response);
                   if (response && response.indexOf("*MUTE=ON#") > -1) {
                   callback(null, true);
                   }
@@ -207,20 +207,20 @@ BenQProjector.prototype = {
         
         if (muteOn) {
             cmd = this.commands['Mute On'];
-            this.log(this.name, "muted");
+            this.log.info(this.name, "muted");
         }
         else {
             cmd = this.commands['Mute Off'];
-            this.log(this.name, "unmuted");
+            this.log.info(this.name, "unmuted");
         }
         
         this.exec(cmd, function(response, error) {
                   if (error) {
-                  this.log('Serial mute function failed: %s');
+                  this.log.error('Serial mute function failed: %s');
                   callback(error);
                   }
                   else {
-                  this.log('Serial mute function succeeded!');
+                  this.log.debug('Serial mute function succeeded!');
                   callback();
                   }
                   }.bind(this));
@@ -247,6 +247,33 @@ BenQProjector.prototype = {
     // },
         
     getVolume: function(callback) {
+        var cmd = this.commands['Volume State'];
+        
+        this.exec(cmd, function(response, error) {
+                  
+            //VOL:xxxy(xxx)
+            if(response && response.indexOf("*VOL=") > -1) {
+                  var vol = Number(response.split('=')[1].split('#'));
+                  this.volume = vol;
+                //   this.volume = this.dbToPercentage(Number(vol));
+                  //console.log("this.volume=" + this.volume);
+                  callback(null, vol);
+            }
+            else callback(null,0);
+        }.bind(this))
+    },
+
+    setVolumeState: function(value, callback) {
+        this.getVolume();
+        var volDiff = this.volume - value;
+        this.log.info("Setting volume to %s", value);
+        if (volDiff > 0) {
+            while (volDiff > 0)
+            this.setVolumeRelative(Characteristic.VolumeSelector.INCREMENT)
+        } else if (volDiff < 0) {
+            while (volDiff < 0)
+            this.setVolumeRelative(Characteristic.VolumeSelector.DECREMENT)
+        }
         var cmd = this.commands['Volume State'];
         
         this.exec(cmd, function(response, error) {
@@ -361,11 +388,11 @@ BenQProjector.prototype = {
 
       this.exec(cmd, function(response, error) {
         if (error) {
-            this.log('Serial increase volume function failed: ' + error);
+            this.log.error('Serial increase volume function failed: ' + error);
             callback(error);
         }
         else {
-            this.log("Changing volume");
+            this.log.debug("Changing volume");
             // var tagetChar = this.volumeDownSwitchService.getCharacteristic(Characteristic.On);
             // var targetCharVol = this.speakerService.getCharacteristic(Characteristic.Volume);
             
@@ -388,6 +415,7 @@ BenQProjector.prototype = {
                   this.default_inputs.forEach((i, x) =>  {
                     if (i['name'] == src) {
                       srcNr = x;
+                      this.log.debug("Input is %s", i['name']);
                     }
                   })
                   //console.log("src =" + src + " srcNr = " + srcNr);
@@ -402,21 +430,21 @@ BenQProjector.prototype = {
         var input = this.default_inputs[port];
         cmd = cmd + input['input'] + "\r"
         
-        this.log.debug('Setting Input %s.', input['input'])
+        this.log.info('Setting Input %s.', input['input'])
         this.exec(cmd, function(response, error) {
             if (error) {
-                this.log('Set Input function failed: ' + error);
+                this.log.error('Set Input function failed: ' + error);
                 callback(error);
             }
             else {
-                this.log('Set Input function succeeded!');
+                this.log.debug('Set Input function succeeded!');
                 callback();
             }
         }.bind(this));
     },
         
     identify: function(callback) {
-        this.log("Identify requested!");
+        this.log.info("Identify requested!");
         
         this.setPowerState(true); // turn on
         
@@ -479,7 +507,6 @@ BenQProjector.prototype = {
     },
         
     getServices: function() {
-        var that = this;
         
         var informationService = new Service.AccessoryInformation();
         informationService
@@ -582,10 +609,10 @@ BenQProjector.prototype.prepareTvSpeakerService = function() {
       .getCharacteristic(Characteristic.Mute)
       .on('get', this.getMuteState.bind(this))
       .on('set', this.setMuteState.bind(this));
-  // this.tvSpeakerService
-  //     .addCharacteristic(Characteristic.Volume)
-  //     .on('get', this.getVolumeState.bind(this))
-  //     .on('set', this.setVolumeState.bind(this));
+  this.tvSpeakerService
+      .addCharacteristic(Characteristic.Volume)
+      .on('get', this.getVolume.bind(this))
+      .on('set', this.setVolumeState.bind(this));
 
   this.tvService.addLinkedService(this.tvSpeakerService);
   this.enabledServices.push(this.tvSpeakerService);
