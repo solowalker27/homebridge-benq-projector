@@ -13,7 +13,7 @@ module.exports = function(homebridge) {
     
     
 function BenQProjector(log, config) {
-    // configuration
+    // Configuration
     this.name = config['name'];
     this.model = config['model'];
     this.adapter = config['adapter'];
@@ -65,6 +65,9 @@ function BenQProjector(log, config) {
       {"input": "usbreader", "label": "USB Reader"}
     ]
     
+    /////////////////////////////
+    // Setup Serial Connection //
+    /////////////////////////////
     this.serialPort = new SerialPort(this.adapter, {
       baudRate: 115200,
       autoOpen: false
@@ -90,6 +93,10 @@ function BenQProjector(log, config) {
 }
     
 BenQProjector.prototype = {
+
+    //////////////////////////////
+    // Serial Command Functions //
+    //////////////////////////////
         
     send: function(cmd, callback) {
         this.sendCommand(cmd, callback); 
@@ -143,7 +150,16 @@ BenQProjector.prototype = {
                    self.process();
                    }, this.timeout);
     },
-        
+
+
+
+
+
+
+    ///////////////////////////
+    // Functions for HomeKit //
+    ///////////////////////////
+
     getPowerState: function(callback) {
         var cmd = this.commands['Power State'];
         
@@ -226,26 +242,6 @@ BenQProjector.prototype = {
                   }.bind(this));
     },
         
-    // dbToPercentage: function(db) {
-    //     this.log("dbToPercentage");
-    //     var minMaxDiff = maxVolume - minVolume;
-    //     this.log("db = " + db);
-    //     var percentage = 100.0 * (db - minVolume) / minMaxDiff;
-    //     this.log("percentage = " + percentage);
-    //     return percentage;
-    // },
-        
-    // percentageToDb: function(percentage) {
-    //     this.log("percentageToDb");
-    //     var minMaxDiff = maxVolume - minVolume;
-    //     this.log("percentage = " + percentage);
-    //     var db = 0.01 * percentage * minMaxDiff + minVolume;
-    //     if(db > maxVolume) db = maxVolume;
-    //     if(db < minVolume) db = minVolume;
-    //     this.log("db = " + db);
-    //     return db;
-    // },
-        
     getVolume: function(callback) {
         var cmd = this.commands['Volume State'];
         
@@ -288,95 +284,9 @@ BenQProjector.prototype = {
             else callback(null,0);
         }.bind(this))
     },
-        
-    // setVolume: function(value, callback) {
-        
-    //     var db = this.percentageToDb(value);
-    //     if(this.volume != value) {
-    //         this.volume = value;
-    //         var cmd = "@VOL:0";
-    //         if(db > 0) cmd = cmd + "+";
-    //         cmd = cmd + parseInt(db*10.0);
-    //         cmd = cmd + "\r";
-            
-    //         this.exec(cmd, function(response, error) {
-    //                   if (error) {
-    //                   this.log('Serial volume function failed: %s');
-    //                   callback(error);
-    //                   }
-    //                   else {
-    //                   this.log("Set volume to", db, "db");
-    //                   callback();
-    //                   }
-    //                   }.bind(this));
-    //     }
-    //     else {
-    //         this.log("Volume has not changed");
-    //         callback();
-    //     }
-    // },
-
-    // getVolumeUpState: function(callback) {
-    //     callback(null, 0);
-    // },
-
-    // getVolumeDownState: function(callback) {
-    //     callback(null, 0);
-    // },
-        
-    // setVolumeUpState: function(value, callback) {
-        
-    //     var cmd = "\r*vol=+\r";
-        
-    //         this.log('Executing: ' + cmd);
-            
-    //         this.exec(cmd, function(response, error) {
-    //             if (error) {
-    //                 this.log('Serial increase volume function failed: ' + error);
-    //                 callback(error);
-    //             }
-    //             else {
-    //                 this.log("Changing volume");
-    //                 // var tagetChar = this.volumeUpSwitchService.getCharacteristic(Characteristic.On);
-    //                 // var targetCharVol = this.speakerService.getCharacteristic(Characteristic.Volume);
-
-    //                 // targetCharVol.getValue(null);
-    //                 // setTimeout(function(){tagetChar.setValue(0);}, 10);
-    //                 callback();
-    //             }
-    //         }.bind(this));
-    // },
-
-    // setVolumeDownState: function(value, callback) {
-        
-    //     var cmd = "\r*vol=-\r";
-    
-    //         this.log('Executing: ' + cmd);
-            
-    //         this.exec(cmd, function(response, error) {
-    //             if (error) {
-    //                 this.log('Serial increase volume function failed: ' + error);
-    //                 callback(error);
-    //             }
-    //             else {
-    //                 this.log("Changing volume");
-    //                 // var tagetChar = this.volumeDownSwitchService.getCharacteristic(Characteristic.On);
-    //                 // var targetCharVol = this.speakerService.getCharacteristic(Characteristic.Volume);
-                    
-    //                 // targetCharVol.getValue(null);
-    //                 // setTimeout(function(){tagetChar.setValue(0);}, 10);
-    //                 callback();
-    //             }
-    //         }.bind(this));
-        
-    // },
 
     setVolumeRelative: function(volumeDirection, callback) {
-      var that = this;
-    
-      //do the callback immediately, to free homekit
-      //have the event later on execute changes
-      callback( null, that.v_state);
+        // Change volume by pressing Volume Up or Volume Down
       if (volumeDirection == Characteristic.VolumeSelector.INCREMENT) {
         var cmd = this.commands['Volume Up'];
       } else if (volumeDirection == Characteristic.VolumeSelector.DECREMENT) {
@@ -388,22 +298,17 @@ BenQProjector.prototype = {
 
       this.exec(cmd, function(response, error) {
         if (error) {
-            this.log.error('Serial increase volume function failed: ' + error);
+            this.log.error('Serial change volume function failed: ' + error);
             callback(error);
         }
         else {
             this.log.debug("Changing volume");
-            // var tagetChar = this.volumeDownSwitchService.getCharacteristic(Characteristic.On);
-            // var targetCharVol = this.speakerService.getCharacteristic(Characteristic.Volume);
-            
-            // targetCharVol.getValue(null);
-            // setTimeout(function(){tagetChar.setValue(0);}, 10);
             callback();
         }
     }.bind(this));
     },
         
-    getSourcePort: function(callback) {
+    getInputSource: function(callback) {
         var cmd = this.commands['Source Get'];
         
         this.exec(cmd, function(response, error) {
@@ -425,7 +330,7 @@ BenQProjector.prototype = {
         }.bind(this))
     },
         
-    setSourcePort: function(port, callback) {
+    setInputSource: function(port, callback) {
         var cmd = this.commands['Source Set'];
         var input = this.default_inputs[port];
         cmd = cmd + input['input'] + "\r"
@@ -452,9 +357,6 @@ BenQProjector.prototype = {
     },
 
     remoteKeyPress: function(button, callback) {
-      //do the callback immediately, to free homekit
-      //have the event later on execute changes
-      // callback(null, this.i_state);
       if (this.buttons[button]) {
         var press = this.buttons[button]
         this.log.info("remoteKeyPress - INPUT: pressing key %s", press);
@@ -516,49 +418,6 @@ BenQProjector.prototype = {
         .setCharacteristic(Characteristic.SerialNumber, "-");
 
         this.enabledServices.push(informationService);
-        
-        // var switchService = new Service.Switch("Power State", "power_on");
-        // switchService
-        // .getCharacteristic(Characteristic.On)
-        // .on('get', this.getPowerState.bind(this))
-        // .on('set', this.setPowerState.bind(this));
-        
-        // var speakerService = new Service.Speaker("Speaker");
-        // speakerService
-        // .getCharacteristic(Characteristic.Mute)
-        // .on('get', this.getMuteState.bind(this))
-        // .on('set', this.setMuteState.bind(this));
-
-        // speakerService
-        // .getCharacteristic(Characteristic.Volume)
-        // .on('get', this.getVolume.bind(this))
-        // .on('set', this.setVolume.bind(this));
-        
-        // this.speakerService = speakerService;
-              
-        switchService
-        .addCharacteristic(SourceCharacteristic)
-        .on('get', this.getSourcePort.bind(this))
-        .on('set', this.setSourcePort.bind(this));
-        
-        // var volumeUpSwitchService = new Service.Switch("Volume Up", "volume_up");
-        // volumeUpSwitchService
-        // .getCharacteristic(Characteristic.On)
-        // .on('get', this.getVolumeUpState.bind(this))
-        // .on('set', this.setVolumeUpState.bind(this));
-        
-        // this.volumeUpSwitchService = volumeUpSwitchService;
-        
-        // var volumeDownSwitchService = new Service.Switch("Volume Down", "volume_down");
-        // volumeDownSwitchService
-        // .getCharacteristic(Characteristic.On)
-        // .on('get', this.getVolumeDownState.bind(this))
-        // .on('set', this.setVolumeDownState.bind(this));
-        
-        // this.volumeDownSwitchService = volumeDownSwitchService;
- 
-        // return [informationService, switchService, speakerService, volumeUpSwitchService, volumeDownSwitchService];
-
 
         this.tvService = new Service.Television(this.name);
 
