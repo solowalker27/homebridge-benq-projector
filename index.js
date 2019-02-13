@@ -1,12 +1,8 @@
-// Accessory for controlling BenQ Projectors via HomeKit
+// Accessory for controlling BenQ Projectors via HomeKit.
+// Adapted from https://github.com/rooi/homebridge-marantz-rs232
 
 var SerialPort = require("serialport");
 var Service, Characteristic;
-
-// Use a `\r\n` as a line terminator
-const parser = new SerialPort.parsers.Readline({
-                                    delimiter: '\r'
-                                    });
 
 module.exports = function(homebridge) {
     Service = homebridge.hap.Service;
@@ -31,6 +27,19 @@ function BenQProjector(log, config) {
     this.log = log;
 
     this.enabledServices = []
+    this.commands = {
+        "Power On": "\r*pow=on#\r",
+        "Power Off": "\r*pow=off#\r",
+        "Power State": "\r*pow=?#\r",
+        "Mute On": "\r*mute=on#\r",
+        "Mute Off": "\r*mute=off#\r",
+        "Mute State": "\r*mute=?#\r",
+        "Volume Up": "\r*vol=+#\r",
+        "Volume Down": "\r*vol=-#\r",
+        "Volume State": "\r*vol=?#\r",
+        "Source Set": "\r*sour=",
+        "Source Get": "\r*sour=?#\r"
+    }
     this.buttons = {
       [Characteristic.RemoteKey.ARROW_UP]: '\r*up#\r',
       [Characteristic.RemoteKey.ARROW_DOWN]: '\r*down#\r',
@@ -57,23 +66,27 @@ function BenQProjector(log, config) {
     ]
     
     this.serialPort = new SerialPort(this.adapter, {
-                                      baudRate: 115200,
-                                      autoOpen: false
-                                      }); // this is the openImmediately flag [default is true]
+      baudRate: 115200,
+      autoOpen: false
+    }); // this is the openImmediately flag [default is true]
+    
+    // Use a `\r\n` as a line terminator
+    const parser = new SerialPort.parsers.Readline({
+      delimiter: '\r'
+    });
     
     this.serialPort.pipe(parser);
     
     parser.on('data', function(data) {
-                        
-                        this.log("Received data: " + data);
-                        this.serialPort.close(function(error) {
-                            this.log("Closing connection");
-                            if(error) this.log("Error when closing connection: " + error)
-                            var callback;
-                            if(this.callbackQueue.length) callback = this.callbackQueue.shift()
-                                if(callback) callback(data,0);
-                            }.bind(this)); // close after response
-                        }.bind(this));
+      this.log("Received data: " + data);
+      this.serialPort.close(function(error) {
+        this.log("Closing connection");
+        if(error) this.log("Error when closing connection: " + error)
+        var callback;
+        if(this.callbackQueue.length) callback = this.callbackQueue.shift()
+          if(callback) callback(data,0);
+      }.bind(this)); // close after response
+    }.bind(this));
 }
     
 BenQProjector.prototype = {
@@ -132,7 +145,7 @@ BenQProjector.prototype = {
     },
         
     getPowerState: function(callback) {
-        var cmd = "\r*pow=?#\r";
+        var cmd = this.commands['Power State'];
         
         this.log("getPowerState");
         
@@ -153,11 +166,11 @@ BenQProjector.prototype = {
         var cmd;
         
         if (powerOn) {
-            cmd = "\r*pow=on#\r";
+            cmd = this.commands['Power On'];
             this.log("Set", this.name, "to on");
         }
         else {
-            cmd = "\r*pow=off#\r";
+            cmd = this.commands['Power Off'];
             this.log("Set", this.name, "to off");
         }
 
@@ -174,7 +187,7 @@ BenQProjector.prototype = {
     },
         
     getMuteState: function(callback) {
-        var cmd = "\r*mute=?#\r";
+        var cmd = this.commands['Mute State'];
         
         this.exec(cmd, function(response, error) {
                   
@@ -193,11 +206,11 @@ BenQProjector.prototype = {
         var cmd;
         
         if (muteOn) {
-            cmd = "\r*mute=on#\r";
+            cmd = this.commands['Mute On'];
             this.log(this.name, "muted");
         }
         else {
-            cmd = "\r*mute=off#\r";
+            cmd = this.commands['Mute Off'];
             this.log(this.name, "unmuted");
         }
         
@@ -234,24 +247,16 @@ BenQProjector.prototype = {
     // },
         
     getVolume: function(callback) {
-        var cmd = "\r*vol=?#\r";
+        var cmd = this.commands['Volume State'];
         
         this.exec(cmd, function(response, error) {
                   
             //VOL:xxxy(xxx)
             if(response && response.indexOf("*VOL=") > -1) {
-                  var vol = 0;
-                  if(response.indexOf("+") > -1) {
-                    //console.log("+");
-                    vol = response.substring(6,8);
-                  }
-                  else {
-                    //console.log("-");
-                    vol = response.substring(5,8);
-                  }
-                  this.volume = this.dbToPercentage(Number(vol));
+                  var vol = Number(response.split('=')[1].split('#'));
+                //   this.volume = this.dbToPercentage(Number(vol));
                   //console.log("this.volume=" + this.volume);
-                  callback(null, Number(this.volume));
+                  callback(null, vol);
             }
             else callback(null,0);
         }.bind(this))
@@ -346,9 +351,9 @@ BenQProjector.prototype = {
       //have the event later on execute changes
       callback( null, that.v_state);
       if (volumeDirection == Characteristic.VolumeSelector.INCREMENT) {
-        var cmd = "\r*vol=+#\r";
+        var cmd = this.commands['Volume Up'];
       } else if (volumeDirection == Characteristic.VolumeSelector.DECREMENT) {
-        var cmd = "\r*vol=-#\r";
+        var cmd = this.commands['Volume Up'];
       } else {
         that.log.error( "setVolumeRelative - VOLUME : ERROR - unknown direction sent");
         callback(error);
@@ -372,7 +377,7 @@ BenQProjector.prototype = {
     },
         
     getSourcePort: function(callback) {
-        var cmd = "\r*sour=?#\r";
+        var cmd = this.commands['Source Get'];
         
         this.exec(cmd, function(response, error) {
 
@@ -393,7 +398,7 @@ BenQProjector.prototype = {
     },
         
     setSourcePort: function(port, callback) {
-        var cmd = "\r*sour=";
+        var cmd = this.commands['Source Set'];
         var input = this.default_inputs[port];
         cmd = cmd + input['input'] + "\r"
         
