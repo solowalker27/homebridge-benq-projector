@@ -2,7 +2,7 @@
  "bridge": {
 },
  "accessories": [{
-      "accessory": "BenQProjector",
+      "accessory": "BenQ-Projector",
       "name": "BenQ w1070",
       "model": "W1070",
       "adapter": "/dev/ttyUSB0"
