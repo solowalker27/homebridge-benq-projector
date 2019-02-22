@@ -1,9 +1,6 @@
 // Taken from https://github.com/grover/homebridge-epson-projector-rs232
 'use strict';
 
-const debug = require('debug')('ESCVP21');
-const serial = require('debug')('ESCVP21:serial');
-
 const SerialPort = require('serialport');
 const EventEmitter = require('events').EventEmitter;
 
@@ -21,12 +18,13 @@ function noop() {
 
 class Transport extends EventEmitter {
 
-  constructor(port) {
+  constructor(port, log) {
     super();
 
     this._currentRx = Buffer.alloc(0);
     this._pendingReads = [];
     this._command = 0;
+    this.log = log;
 
     this._port = new SerialPort(port, {
       autoOpen: true,
@@ -63,21 +61,21 @@ class Transport extends EventEmitter {
   }
 
   _onSerialPortClosed(err) {
-    console.log(`SignalPort closed: ${err}`);
+    this.log.error(`SignalPort closed: ${err}`);
     this._changeState(TransportStates.DISCONNECTED);
   }
 
   _onSerialPortFailed(err) {
-    console.log(`SerialPort signaled error: ${err}`);
+    this.log.error(`SerialPort signaled error: ${err}`);
     this.emit('error', err);
   }
 
   _onSerialPortData(data) {
     data = Buffer.from(data);
-    console.log(`SerialPort received ${JSON.stringify(data)}`);
+    this.log.debug(`SerialPort received ${JSON.stringify(data)}`);
 
     this._currentRx = Buffer.concat([this._currentRx, data]);
-    console.log(`SerialPort now pending ${JSON.stringify(this._currentRx)}`);
+    this.log.debug(`SerialPort now pending ${JSON.stringify(this._currentRx)}`);
 
     // Verify if this a complete line
     this._handlePendingData();
@@ -103,24 +101,24 @@ class Transport extends EventEmitter {
 
       let response = null;
       for (let attempt = 0; response === null && attempt < 3; attempt++) {
-        console.log(`Begin processing command ${commandId} - attempt #${attempt}`);
+        this.log.debug(`Begin processing command ${commandId} - attempt #${attempt}`);
         const timeoutPromise = this._createTimeout(timeout);
         const readPromise = this._scheduleRead();
         await this._sendCommand(cmd);
 
         response = await Promise.race([readPromise, timeoutPromise]);
         if (response === null) {
-          console.log('Command execution timed out.');
+          this.log.debug('Command execution timed out.');
           this._synchronize();
         }
       }
 
 
-      console.log(`Done processing command ${commandId}: response=${JSON.stringify(response)}`);
+      this.log.debug(`Done processing command ${commandId}: response=${JSON.stringify(response)}`);
       if (response === null) {
-        throw new Error('Command execution timed out.');
+        throw new Error('Command execution returned null.');
       }
-      if (response.startsWith('ERR\r:')) {
+      if (response.indexOf('Illegal') > -1) {
         throw new Error('Unsupported command');
       }
 
@@ -131,7 +129,7 @@ class Transport extends EventEmitter {
 
   _sendCommand(cmd) {
     return new Promise((resolve, reject) => {
-      console.log(`Sending ${cmd}`);
+      this.log.debug(`Sending ${cmd}`);
       this._port.write(cmd, 'ascii', (err) => {
         if (err) {
           reject(err);
@@ -161,7 +159,7 @@ class Transport extends EventEmitter {
       const line = this._currentRx.slice(0, readyMarker + 1).toString('ascii');
       this._currentRx = this._currentRx.slice(readyMarker + 1);
 
-      console.log(`Processing response ${JSON.stringify(line)}, remaining ${JSON.stringify(this._currentRx)}`);
+      this.log.debug(`Processing response ${JSON.stringify(line)}, remaining ${JSON.stringify(this._currentRx)}`);
 
       const pendingRead = this._pendingReads.shift() || noop;
       pendingRead(line);
@@ -169,7 +167,7 @@ class Transport extends EventEmitter {
   }
 
   _changeState(state) {
-    console.log(`Changing state to ${state}`);
+    this.log.debug(`Changing state to ${state}`);
 
     switch (state) {
       case TransportStates.CONNECTING:
@@ -186,23 +184,23 @@ class Transport extends EventEmitter {
   }
 
   _onConnecting() {
-    console.log('Connecting to projector...');
+    this.log.debug('Connecting to projector...');
   }
 
   _onConnected() {
-    console.log('Connected to projector...');
+    this.log.info('Connected to projector...');
     this._backoff.reset();
 
     // TODO: Initiate connection check timer?
   }
 
   _onDisconnected() {
-    console.log('Disconnected from projector...');
+    this.log.info('Disconnected from projector...');
     this._backoff.backoff();
   }
 
   async _synchronize() {
-    console.log('Synchronizing with projector...');
+    this.log.debug('Synchronizing with projector...');
 
     let synchronized = false;
     for (let attempt = 0; attempt < 3 && synchronized === false; attempt++) {
@@ -214,13 +212,13 @@ class Transport extends EventEmitter {
       }
     }
 
-    console.log(`Synchronization completed... ${synchronized ? 'succesful' : 'FAILED'}`);
+    this.log.debug(`Synchronization completed... ${synchronized ? 'succesful' : 'FAILED'}`);
     return synchronized;
   }
 
   _drainAndFlush() {
     return new Promise((resolve, reject) => {
-      console.log('Drain rx queue');
+      this.log.debug('Drain rx queue');
       this._currentRx = Buffer.alloc(0);
       this._pendingReads.forEach(p => p(null));
       this._pendingReads = [];
@@ -244,24 +242,24 @@ class Transport extends EventEmitter {
   }
 
   async _sendNullCommand() {
-    console.log('Sending empty command to poll status');
+    this.log.debug('Sending empty command to poll status');
     try {
       const response = await this._execute('\r', 10000);
-      console.log(`Response is: ${response}`)
+      this.log.debug(`Response is: ${response}`)
       const anglePos = response.indexOf('>');
-      console.log(`anglePos is: ${anglePos}`)
+      this.log.debug(`anglePos is: ${anglePos}`)
 
       // return anglePos !== -1 && anglePos === (response.length - 1);
       return anglePos !== -1;
     }
     catch (e) {
-      console.log(`Failed to send empty command. ${e}`);
+      this.log.error(`Failed to send empty command. ${e}`);
       return false;
     }
   }
 
   _onBackoffStarted(delay) {
-    console.log(`Attempting to reconnect in ${delay / 1000} seconds.`);
+    this.log.debug(`Attempting to reconnect in ${delay / 1000} seconds.`);
   }
 
   async _connect() {

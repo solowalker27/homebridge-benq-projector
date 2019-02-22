@@ -29,7 +29,8 @@ class BenQProjector {
         this.ready = true;
         this.pollingInterval = 10000;
         // this.pollingInterval = this.config['pollingInterval'] || 10000;
-        this.lastKnownSource = 0
+        this.lastKnownSource = 0;
+        this.state = false;
         
         this.log = log;
 
@@ -103,8 +104,8 @@ class BenQProjector {
         /////////////////////////////
         // Setup Serial Connection //
         /////////////////////////////
-        this._isReachable = false;
-        this.serialPort = new Transport(this.adapter);
+        // this._isReachable = false;
+        this.serialPort = new Transport(this.adapter, this.log);
 
         this.serialPort.on('connected', this._onConnected.bind(this));
         this.serialPort.on('disconnected', this._onDisconnected.bind(this));
@@ -146,39 +147,65 @@ class BenQProjector {
     //////////////////////////////
 
     async _onConnected() {
-        this.log('Connected. Refreshing characteristics.');
+        this.log.info('Connected. Refreshing characteristics.');
         // await this._refreshSerialNumber();
         await this._refreshProjectorStatus();
     
-        this._setReachable(true);
+        // this._setReachable(true);
     }
 
     _onDisconnected() {
-        this.log('Disconnected');
-        this._setReachable(false);
+        this.log.info('Disconnected');
+        // this._setReachable(false);
     }
 
-    _setReachable(state) {
-        this.log(`Reachable: ${state}`);
-        if (this._isReachable === state) {
-          return;
+    async _sendCommand(cmd) {
+        const response = await this.serialPort.execute(cmd);
+
+        if (response.indexOf("Block") > -1) {
+            this.log.debug("Block in response. Retrying.")
+            setTimeout(() => {
+                this._sendCommand(cmd);
+              }, this.pollingInterval/2);
+        } 
+        if (response === ">") {
+            this.log.debug("Ready response returned. Retrying.")
+            setTimeout(() => {
+                this._sendCommand(cmd);
+              }, this.pollingInterval/4);
+        } 
+        if (response === undefined) {
+            this.log.debug("Response was undefined. Retrying.")
+            setTimeout(() => {
+                this._sendCommand(cmd);
+              }, this.pollingInterval/4);
+        } else {
+            return response;
         }
-    
-        this._isReachable = state;
-    
-        this._bridgingService.getCharacteristic(Characteristic.Reachable)
-          .updateValue(this._isReachable);
+
     }
 
-    getBridgingStateService() {
-        this._bridgingService = new Service.BridgingState();
+    // _setReachable(state) {
+    //     this.log(`Reachable: ${state}`);
+    //     if (this._isReachable === state) {
+    //       return;
+    //     }
     
-        this._bridgingService.getCharacteristic(Characteristic.Reachable)
-          .updateValue(this._isReachable);
+    //     this._isReachable = state;
     
-        this.enabledServices.push(this._bridgingService);
-        // return this._bridgingService;
-    }
+    //     this._bridgingService.getCharacteristic(Characteristic.Reachable)
+    //       .updateValue(this._isReachable);
+    // }
+
+    // getBridgingStateService() {
+    //     this._bridgingService = new Service.BridgingState();
+    
+    //     this._bridgingService.getCharacteristic(Characteristic.Reachable)
+    //       .updateValue(this._isReachable);
+    
+    //     this.enabledServices.push(this._bridgingService);
+    //     // return this._bridgingService;
+    // }
         
     // send: function(cmd, callback) {
     //     this.sendCommand(cmd, callback); 
@@ -243,18 +270,22 @@ class BenQProjector {
     ///////////////////////////
 
     async _refreshProjectorStatus() {
-        this.log('Refresh projector status');
+        this.log.info('Refresh projector status');
     
         try {
-          const powerStatus = await this.getPowerState();
-    
-        //   if (powerStatus) {
-        //     await this._projectorInputService.update();
-        //   }
+            this.log.info('Refreshing power state.')
+          await this.getPowerState();
+          this.log.info('Power state refreshed.')
+
+          if (this.state) {
+            this.log.info('Refreshing input source.')
+            await this.getInputSource();
+            this.log.info('Input source refreshed.')
+          }
         }
         catch (e) {
           // Do not leak the exception
-          this.log(`Failed to refresh projector status: ${e}`);
+          this.log.error(`Failed to refresh projector status: ${e}`);
         }
     
         // Schedule another update
@@ -263,27 +294,34 @@ class BenQProjector {
         }, this.pollingInterval);
     }
 
-    async getPowerState() {
-        const powerState = await this.serialPort.execute(this.commands['Power State']);
-        console.log(`powerState is: ${powerState}`)
-        var state = null;
-        if (powerState.indexOf("ON") > -1) {
-            console.log('Power is On')
-            state = true;
+    async getPowerState(callback) {
+        // const powerState = await this.serialPort.execute(this.commands['Power State']);
+        try {
+            this.log.debug('Getting power state.')
+            const powerState = await this._sendCommand(this.commands['Power State']);
+            this.log.debug(`powerState is: ${powerState}`)
+            if (powerState.indexOf("ON") > -1) {
+                this.log.info('Power is On')
+                this.state = true;
+            }
+            if (powerState.indexOf("OFF") > -1) {
+                this.log.info('Power is Off')
+                this.state = false;
+            }
+            // if (this.state === null) {
+            //   throw new Error('Failed to process response to ' + this.commands['Power State']);
+            // }
         }
-        if (powerState.indexOf("OFF") > -1) {
-            console.log('Power is Off')
-            state = false;
+        catch (e) {
+            this.log.error(`Failed to get power state: ${e}`)
         }
-        if (state === null) {
-        //   throw new Error('Failed to process response to ' + this.commands['Power State']);
+        if (callback) {
+            callback(null, this.state);
         }
         
         this.tvService
             .getCharacteristic(Characteristic.Active)
-            .updateValue(state);
-        
-        return state;
+            .updateValue(this.state);
     }
 
     // getPowerState: function(callback) {
@@ -314,22 +352,28 @@ class BenQProjector {
     // },
         
     async setPowerState(value, callback) {
-        this.log(`Set projector power state to ${value}`);
+
+        // if (callback) {
+        //     callback(null, this.state);
+        // }
+        this.log.info(`Set projector power state to ${value}`);
         try {
           let cmd = this.commands['Power Off'];
           if (value) {
             cmd = this.commands['Power On'];
           }
     
-          await this.serialPort.execute(cmd);
-          callback(undefined);
+        //   await this.serialPort.execute(cmd);
+          await this._sendCommand(cmd);
+          await this.getPowerState();
+          callback(null, this.state)
         }
         catch (e) {
-          this.log(`Failed to set power state ${e}`);
-          callback(e);
+          this.log.error(`Failed to set power state ${e}`);
+        //   callback(e);
         }
 
-        await this.getPowerState();
+        
     }
 
     // setPowerState: function(powerOn, callback) {
@@ -485,8 +529,10 @@ class BenQProjector {
     // }.bind(this));
     // },
 
-    async getInputSource() {
-        const status = await this.serialPort.execute(this.commands['Source Get']);
+    async getInputSource(callback) {
+        // const status = await this.serialPort.execute(this.commands['Source Get']);
+        this.log.info("+++++ Getting source")
+        const status = await this._sendCommand(this.commands['Source Get']);
         if (status.indexOf("*sour=") > -1) {
 
           var src = response.split("=")[1].split("#");
@@ -499,15 +545,19 @@ class BenQProjector {
               }
           })
 
-          this.tvService
-            .getCharacteristic(Characteristic.ActiveIdentifier)
-            .updateValue(this.lastKnownSource);
-        
+            if (callback) {
+                callback(null, this.lastKnownSource);
+            }
+
             // return this.lastKnownSource;
         }
         else {
-          this.log(`Failed to refresh Input state: ${this.commands['Source Get']} => ${status}`);
+          this.log.error(`Failed to refresh Input state: ${this.commands['Source Get']} => ${status}`);
         }
+
+        this.tvService
+            .getCharacteristic(Characteristic.ActiveIdentifier)
+            .updateValue(this.lastKnownSource);
     }
         
     // getInputSource: function(callback) {
@@ -545,21 +595,22 @@ class BenQProjector {
     // },
 
     async setInputSource(source, callback) {
-        this.log(`Set projector Input to ${source}`);
+        this.log.info(`Set projector Input to ${source}`);
         var cmd = this.commands['Source Set'];
         var input = this.default_inputs[source];
         cmd = cmd + input['input'] + "#";
 
         try {
           
-          this.log(`Sending ${cmd}`);
-          await this.serialPort.execute(cmd);
-          callback(undefined);
+          this.log.info(`Sending setInputSource ${cmd}`);
+        //   await this.serialPort.execute(cmd);
+          await this._sendCommand(cmd);
+        //   callback(undefined);
     
-          await this.getInputSource();
+          await this.getInputSource(callback);
         }
         catch (e) {
-          this.log(`Failed to set characteristic ${e}`);
+          this.log.error(`Failed to set characteristic ${e}`);
           callback(e);
         }
     }
@@ -687,7 +738,7 @@ class BenQProjector {
         
         this.enabledServices.push(this.tvService);
         // this.prepareTvSpeakerService();
-        this.getBridgingStateService();
+        // this.getBridgingStateService();
         return this.enabledServices;
     }
     
