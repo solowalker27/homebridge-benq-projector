@@ -296,6 +296,9 @@ class BenQProjector {
 
     async getPowerState(callback) {
         // const powerState = await this.serialPort.execute(this.commands['Power State']);
+        if (callback) {
+          callback(null, this.state);
+        }
         try {
             this.log.debug('Getting power state.')
             const powerState = await this._sendCommand(this.commands['Power State']);
@@ -314,9 +317,6 @@ class BenQProjector {
         }
         catch (e) {
             this.log.error(`Failed to get power state: ${e}`)
-        }
-        if (callback) {
-            callback(null, this.state);
         }
         
         this.tvService
@@ -353,9 +353,9 @@ class BenQProjector {
         
     async setPowerState(value, callback) {
 
-        // if (callback) {
-        //     callback(null, this.state);
-        // }
+        if (callback) {
+            callback(null, value);
+        }
         this.log.info(`Set projector power state to ${value}`);
         try {
           let cmd = this.commands['Power Off'];
@@ -366,7 +366,7 @@ class BenQProjector {
         //   await this.serialPort.execute(cmd);
           await this._sendCommand(cmd);
           await this.getPowerState();
-          callback(null, this.state)
+          this.state = value;
         }
         catch (e) {
           this.log.error(`Failed to set power state ${e}`);
@@ -532,6 +532,9 @@ class BenQProjector {
     async getInputSource(callback) {
         // const status = await this.serialPort.execute(this.commands['Source Get']);
         this.log.info("+++++ Getting source")
+        if (callback) {
+          callback(null, this.lastKnownSource);
+        }
         const status = await this._sendCommand(this.commands['Source Get']);
         if (status.indexOf("*sour=") > -1) {
 
@@ -540,14 +543,10 @@ class BenQProjector {
               if (i['name'] == src) {
                   readable = true;
               this.lastKnownSource = x;
-              this.log.debug("Input is %s", i['name']);
+              this.log.info("Input is %s", i['name']);
 
               }
           })
-
-            if (callback) {
-                callback(null, this.lastKnownSource);
-            }
 
             // return this.lastKnownSource;
         }
@@ -555,6 +554,8 @@ class BenQProjector {
           this.log.error(`Failed to refresh Input state: ${this.commands['Source Get']} => ${status}`);
         }
 
+        this.log.info("Setting ActiveIdentifier to:");
+        this.log.info(this.lastKnownSource)
         this.tvService
             .getCharacteristic(Characteristic.ActiveIdentifier)
             .updateValue(this.lastKnownSource);
@@ -596,6 +597,9 @@ class BenQProjector {
 
     async setInputSource(source, callback) {
         this.log.info(`Set projector Input to ${source}`);
+        if (callback) {
+          callback();
+        }
         var cmd = this.commands['Source Set'];
         var input = this.default_inputs[source];
         cmd = cmd + input['input'] + "#";
@@ -607,7 +611,7 @@ class BenQProjector {
           await this._sendCommand(cmd);
         //   callback(undefined);
     
-          await this.getInputSource(callback);
+          await this.getInputSource();
         }
         catch (e) {
           this.log.error(`Failed to set characteristic ${e}`);
@@ -643,25 +647,24 @@ class BenQProjector {
         if(callback) callback();
     }
 
-    // remoteKeyPress: function(button, callback) {
-    //   if (this.buttons[button]) {
-    //     var press = this.buttons[button]
-    //     this.log.info("remoteKeyPress - INPUT: pressing key %s", press);
-    //     this.exec(press, function(response, error) {
-    //         this.log.info(response)
-    //       if (error) {
-    //           this.log.error("remoteKeyPress - INPUT: ERROR pressing button %s.", press);
-    //           callback(error);
-    //       }
-    //       else {
-    //           this.log.debug("remoteKeyPress - INPUT: pressing key %s succeeded", press);
-    //           callback();
-    //       }
-    //     }.bind(this) );
-    //   } else {
-    //     this.log.error('Remote button %d not supported.', button)
-    //   }
-    // },
+    async remoteKeyPress(button, callback) {
+      if (callback) {
+        callback();
+      }
+      if (this.buttons[button]) {
+        var press = this.buttons[button]
+      } else {
+        this.log.error('Remote button %d not supported.', button)
+        return
+      }
+      this.log.info("remoteKeyPress - INPUT: pressing key %s", press);
+      try {
+        await this._sendCommand(press);
+      } catch (e) {
+        this.log.error(`Failed to press remote key: ${e}`);
+        callback(e);
+      }
+    }
 
     addSources(service) {
       // If input name mappings are provided, use them.
@@ -727,14 +730,14 @@ class BenQProjector {
         //   .on('get', this.getPowerState.bind(this))
         //   .on('set', this.setPowerState.bind(this));
 
-        // this.tvService
-        //     .getCharacteristic(Characteristic.ActiveIdentifier)
-        //     .on('set', await this.setInputSource.bind(this))
-        //     .on('get', await this.getInputSource.bind(this));
+        this.tvService
+            .getCharacteristic(Characteristic.ActiveIdentifier)
+            .on('set', this.setInputSource.bind(this))
+            .on('get', this.getInputSource.bind(this));
       
-        // this.tvService
-        //     .getCharacteristic(Characteristic.RemoteKey)
-        //     .on('set', this.remoteKeyPress.bind(this));
+        this.tvService
+            .getCharacteristic(Characteristic.RemoteKey)
+            .on('set', this.remoteKeyPress.bind(this));
         
         this.enabledServices.push(this.tvService);
         // this.prepareTvSpeakerService();
