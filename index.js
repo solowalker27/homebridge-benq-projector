@@ -27,7 +27,7 @@ class BenQProjector {
         this.callbackQueue = [];
         // this.readBuffer = [];
         this.ready = true;
-        this.pollingInterval = 10000;
+        this.pollingInterval = config.pollingInterval || 10000;
         // this.pollingInterval = this.config['pollingInterval'] || 10000;
         this.lastKnownSource = 0;
         this.state = false;
@@ -160,29 +160,76 @@ class BenQProjector {
     }
 
     async _sendCommand(cmd) {
+        this.log.info("_sendCommand: %s", cmd)
         const response = await this.serialPort.execute(cmd);
 
+        // Error handling
         if (response.indexOf("Block") > -1) {
-            this.log.debug("Block in response. Retrying.")
+            this.log.info("Block in response. Retrying.")
             setTimeout(() => {
                 this._sendCommand(cmd);
               }, this.pollingInterval/2);
         } 
         if (response === ">") {
-            this.log.debug("Ready response returned. Retrying.")
+            this.log.info("Ready response returned. Retrying.")
             setTimeout(() => {
                 this._sendCommand(cmd);
               }, this.pollingInterval/4);
         } 
         if (response === undefined) {
-            this.log.debug("Response was undefined. Retrying.")
+            this.log.info("Response was undefined. Retrying.")
             setTimeout(() => {
                 this._sendCommand(cmd);
               }, this.pollingInterval/4);
-        } else {
-            return response;
+        } 
+        // else {
+        //     return response;
+        // }
+
+        // Response handling
+        if (response.indexOf("*pow=") > -1) {
+          this.handlePowResponse(response);
+        }
+        if (response.indexOf("*sour=") > -1) {
+          this.handleSourResponse(response);
         }
 
+    }
+
+    handlePowResponse(response) {
+            if (response.indexOf("ON") > -1) {
+                this.log.info('Power is On')
+                this.state = true;
+            }
+            if (response.indexOf("OFF") > -1) {
+                this.log.info('Power is Off')
+                this.state = false;
+            }
+        
+        this.tvService
+            .getCharacteristic(Characteristic.Active)
+            .updateValue(this.state);
+    }
+
+    handleSourResponse(response) {
+        this.log.info("getInput response:")
+        this.log.info(response)
+        this.log.info("getInput lower:")
+        this.log.info(response.toLowerCase())
+        this.default_inputs.forEach((i, x) =>  {
+          this.log.info(i.input)
+          this.log.info(response.toLowerCase().indexOf(i.input.toLowerCase() +"#"))
+            if (response.toLowerCase().indexOf(i.input.toLowerCase() +"#") > -1) {
+            this.lastKnownSource = x;
+            this.log.info("Input is %s", i.input);
+
+            }
+        })
+        this.log.info("Setting ActiveIdentifier to:");
+        this.log.info(this.lastKnownSource)
+        this.tvService
+            .getCharacteristic(Characteristic.ActiveIdentifier)
+            .updateValue(this.lastKnownSource);
     }
 
     // _setReachable(state) {
@@ -300,17 +347,18 @@ class BenQProjector {
           callback(null, this.state);
         }
         try {
-            this.log.debug('Getting power state.')
-            const powerState = await this._sendCommand(this.commands['Power State']);
-            this.log.debug(`powerState is: ${powerState}`)
-            if (powerState.indexOf("ON") > -1) {
-                this.log.info('Power is On')
-                this.state = true;
-            }
-            if (powerState.indexOf("OFF") > -1) {
-                this.log.info('Power is Off')
-                this.state = false;
-            }
+            this.log.info('Getting power state.')
+            await this._sendCommand(this.commands['Power State']);
+            // this.log.info(`powerState is: ${powerState}`)
+            // if (powerState.indexOf("ON") > -1) {
+            //     this.log.info('Power is On')
+            //     this.state = true;
+            // }
+            // if (powerState.indexOf("OFF") > -1) {
+            //     this.log.info('Power is Off')
+            //     this.state = false;
+            // }
+
             // if (this.state === null) {
             //   throw new Error('Failed to process response to ' + this.commands['Power State']);
             // }
@@ -319,9 +367,9 @@ class BenQProjector {
             this.log.error(`Failed to get power state: ${e}`)
         }
         
-        this.tvService
-            .getCharacteristic(Characteristic.Active)
-            .updateValue(this.state);
+        // this.tvService
+        //     .getCharacteristic(Characteristic.Active)
+        //     .updateValue(this.state);
     }
 
     // getPowerState: function(callback) {
@@ -395,7 +443,7 @@ class BenQProjector {
     //               if(callback) callback(error);
     //               }
     //               else {
-    //               this.log.debug('Serial power function succeeded!');
+    //               this.log.info('Serial power function succeeded!');
     //               if(callback) callback();
     //               }
     //               }.bind(this));
@@ -443,7 +491,7 @@ class BenQProjector {
     //               callback(error);
     //               }
     //               else {
-    //               this.log.debug('Serial mute function succeeded!');
+    //               this.log.info('Serial mute function succeeded!');
     //               callback();
     //               }
     //               }.bind(this));
@@ -523,7 +571,7 @@ class BenQProjector {
     //         callback(error);
     //     }
     //     else {
-    //         this.log.debug("Changing volume");
+    //         this.log.info("Changing volume");
     //         callback();
     //     }
     // }.bind(this));
@@ -535,30 +583,32 @@ class BenQProjector {
         if (callback) {
           callback(null, this.lastKnownSource);
         }
-        const status = await this._sendCommand(this.commands['Source Get']);
-        if (status.indexOf("*sour=") > -1) {
+        try {
+          await this._sendCommand(this.commands['Source Get']);
+        // this.log.info("getInput status:")
+        // this.log.info(status)
+        // if (status.indexOf("*sour=") > -1) {
+        //   var src = response.split("=")[1].split("#");
+        //   this.default_inputs.forEach((i, x) =>  {
+        //       if (i['name'] == src) {
+        //           readable = true;
+        //       this.lastKnownSource = x;
+        //       this.log.info("Input is %s", i['name']);
 
-          var src = response.split("=")[1].split("#");
-          this.default_inputs.forEach((i, x) =>  {
-              if (i['name'] == src) {
-                  readable = true;
-              this.lastKnownSource = x;
-              this.log.info("Input is %s", i['name']);
-
-              }
-          })
+        //       }
+        //   })
 
             // return this.lastKnownSource;
         }
-        else {
-          this.log.error(`Failed to refresh Input state: ${this.commands['Source Get']} => ${status}`);
+        catch (e) {
+          this.log.error(`Failed to refresh Input state: ${this.commands['Source Get']} => ${e}`);
         }
 
-        this.log.info("Setting ActiveIdentifier to:");
-        this.log.info(this.lastKnownSource)
-        this.tvService
-            .getCharacteristic(Characteristic.ActiveIdentifier)
-            .updateValue(this.lastKnownSource);
+        // this.log.info("Setting ActiveIdentifier to:");
+        // this.log.info(this.lastKnownSource)
+        // this.tvService
+        //     .getCharacteristic(Characteristic.ActiveIdentifier)
+        //     .updateValue(this.lastKnownSource);
     }
         
     // getInputSource: function(callback) {
@@ -578,7 +628,7 @@ class BenQProjector {
     //                     if (i['name'] == src) {
     //                         readable = true;
     //                     srcNr = x;
-    //                     this.log.debug("Input is %s", i['name']);
+    //                     this.log.info("Input is %s", i['name']);
     //                     }
     //                 })
     //                 //console.log("src =" + src + " srcNr = " + srcNr);
@@ -609,7 +659,11 @@ class BenQProjector {
           this.log.info(`Sending setInputSource ${cmd}`);
         //   await this.serialPort.execute(cmd);
           await this._sendCommand(cmd);
-        //   callback(undefined);
+        //   this.lastKnownSource = source;
+        // //   callback(undefined);
+        //   this.tvService
+        //       .getCharacteristic(Characteristic.ActiveIdentifier)
+        //       .updateValue(this.lastKnownSource);
     
           await this.getInputSource();
         }
@@ -617,6 +671,7 @@ class BenQProjector {
           this.log.error(`Failed to set characteristic ${e}`);
           callback(e);
         }
+
     }
         
     // setInputSource: function(port, callback) {
@@ -633,7 +688,7 @@ class BenQProjector {
     //             callback(error);
     //         }
     //         else {
-    //             this.log.debug('Set Input function succeeded!');
+    //             this.log.info('Set Input function succeeded!');
     //             callback();
     //         }
     //     }.bind(this));
