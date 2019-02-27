@@ -80,7 +80,7 @@ class BenQProjector {
         [Characteristic.RemoteKey.ARROW_RIGHT]: "*right#",
         [Characteristic.RemoteKey.SELECT]: "*enter#",
         [Characteristic.RemoteKey.BACK]: "*menu=off#",
-        [Characteristic.RemoteKey.EXIT]: "*menu=off#",
+        [Characteristic.RemoteKey.EXIT]: "*menu=on#",
         [Characteristic.RemoteKey.INFORMATION]: "*menu=on#",
         };
 
@@ -669,7 +669,7 @@ class BenQProjector {
         }
         catch (e) {
           this.log.error(`Failed to set characteristic ${e}`);
-          callback(e);
+          // callback(e);
         }
 
     }
@@ -717,7 +717,7 @@ class BenQProjector {
         await this._sendCommand(press);
       } catch (e) {
         this.log.error(`Failed to press remote key: ${e}`);
-        callback(e);
+        // callback(e);
       }
     }
 
