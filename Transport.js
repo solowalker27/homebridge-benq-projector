@@ -4,7 +4,6 @@
 const SerialPort = require('serialport');
 const EventEmitter = require('events').EventEmitter;
 
-const Backoff = require('backoff');
 const SequentialTaskQueue = require('sequential-task-queue').SequentialTaskQueue;
 
 const TransportStates = {
@@ -42,22 +41,13 @@ class Transport extends EventEmitter {
     this._port.on('error', this._onSerialPortFailed.bind(this));
     this._port.on('data', this._onSerialPortData.bind(this));
 
-    this._backoff = new Backoff.exponential({
-      initialDelay: 100,
-      maxDelay: 60000
-    });
-    this._backoff.on('backoff', this._onBackoffStarted.bind(this));
-    this._backoff.on('ready', this._connect.bind(this));
-
     this._taskQueue = new SequentialTaskQueue();
 
     this.state = TransportStates.DISCONNECTED;
-    // this._port.open()
   }
 
   _onSerialPortOpened() {
-    this._onDisconnected();
-    // this._connect();
+    this._connect();
   }
 
   _onSerialPortClosed(err) {
@@ -72,10 +62,10 @@ class Transport extends EventEmitter {
 
   _onSerialPortData(data) {
     data = Buffer.from(data);
-    this.log.info(`SerialPort received ${JSON.stringify(data)}`);
+    this.log.debug(`SerialPort received ${JSON.stringify(data)}`);
 
     this._currentRx = Buffer.concat([this._currentRx, data]);
-    this.log.info(`SerialPort now pending ${JSON.stringify(this._currentRx)}`);
+    this.log.debug(`SerialPort now pending ${JSON.stringify(this._currentRx)}`);
 
     // Verify if this a complete line
     this._handlePendingData();
@@ -86,8 +76,8 @@ class Transport extends EventEmitter {
       throw new Error('Not connected');
     }
 
-    // Default timeout of 10s
-    timeout = timeout || 10000;
+    // Default timeout of 2s
+    timeout = timeout || 2000;
 
     // Append a \r to the string
     cmd = cmd + '\r';
@@ -96,26 +86,26 @@ class Transport extends EventEmitter {
   }
 
   _execute(cmd, timeout) {
-    // this.log.info(`Executing command: ${cmd}`);
+    this.log.debug(`Executing command: ${cmd}`);
     return this._taskQueue.push(async () => {
       const commandId = this._command++;
 
       let response = null;
       for (let attempt = 0; response === null && attempt < 3; attempt++) {
-        this.log.info(`Begin processing command ${commandId} - attempt #${attempt}`);
+        this.log.debug(`Begin processing command ${commandId} - attempt #${attempt}`);
         const timeoutPromise = this._createTimeout(timeout);
         const readPromise = this._scheduleRead();
         await this._sendCommand(cmd);
 
         response = await Promise.race([readPromise, timeoutPromise]);
         if (response === null) {
-          this.log.info('Command execution timed out.');
+          this.log.debug('Command execution timed out.');
           this._synchronize();
         }
       }
 
 
-      this.log.info(`Done processing command ${commandId}: response=${JSON.stringify(response)}`);
+      this.log.debug(`Done processing command ${commandId}: response=${JSON.stringify(response)}`);
       if (response === null) {
         throw new Error('Command execution returned null.');
       }
@@ -130,7 +120,7 @@ class Transport extends EventEmitter {
 
   _sendCommand(cmd) {
     return new Promise((resolve, reject) => {
-      // this.log.info(`Sending ${cmd}`);
+      this.log.debug(`Sending ${cmd}`);
       this._port.write(cmd, 'ascii', (err) => {
         if (err) {
           reject(err);
@@ -154,13 +144,12 @@ class Transport extends EventEmitter {
   }
 
   _handlePendingData() {
-    // const readyMarker = this._currentRx.indexOf('>') || this._currentRx.indexOf('\r');
     const readyMarker = this._currentRx.indexOf('>');
     if (readyMarker !== -1) {
       const line = this._currentRx.slice(0, readyMarker + 1).toString('ascii');
       this._currentRx = this._currentRx.slice(readyMarker + 1);
 
-      this.log.info(`Processing response ${JSON.stringify(line)}, remaining ${JSON.stringify(this._currentRx)}`);
+      this.log.debug(`Processing response ${JSON.stringify(line)}, remaining ${JSON.stringify(this._currentRx)}`);
 
       const pendingRead = this._pendingReads.shift() || noop;
       pendingRead(line);
@@ -168,7 +157,7 @@ class Transport extends EventEmitter {
   }
 
   _changeState(state) {
-    this.log.info(`Changing state to ${state}`);
+    this.log.debug(`Changing state to ${state}`);
 
     switch (state) {
       case TransportStates.CONNECTING:
@@ -185,23 +174,19 @@ class Transport extends EventEmitter {
   }
 
   _onConnecting() {
-    this.log.info('Connecting to projector...');
+    this.log.debug('Connecting to projector...');
   }
 
   _onConnected() {
     this.log.info('Connected to projector...');
-    this._backoff.reset();
-
-    // TODO: Initiate connection check timer?
   }
 
   _onDisconnected() {
-    this.log.info('Disconnected from projector...');
-    this._backoff.backoff();
+    this.log.debug('Disconnected from projector...');
   }
 
   async _synchronize() {
-    this.log.info('Synchronizing with projector...');
+    this.log.debug('Synchronizing with projector...');
 
     let synchronized = false;
     for (let attempt = 0; attempt < 3 && synchronized === false; attempt++) {
@@ -209,17 +194,17 @@ class Transport extends EventEmitter {
 
       synchronized = await this._sendNullCommand();
       if (synchronized === false) {
-        await this._createTimeout(2000);
+        await this._createTimeout(1000);
       }
     }
 
-    this.log.info(`Synchronization completed... ${synchronized ? 'succesful' : 'FAILED'}`);
+    this.log.debug(`Synchronization completed... ${synchronized ? 'succesful' : 'FAILED'}`);
     return synchronized;
   }
 
   _drainAndFlush() {
     return new Promise((resolve, reject) => {
-      this.log.info('Drain rx queue');
+      this.log.debug('Drain rx queue');
       this._currentRx = Buffer.alloc(0);
       this._pendingReads.forEach(p => p(null));
       this._pendingReads = [];
@@ -243,14 +228,13 @@ class Transport extends EventEmitter {
   }
 
   async _sendNullCommand() {
-    this.log.info('Sending empty command to poll status');
+    this.log.debug('Sending empty command to poll status');
     try {
       const response = await this._execute('\r', 10000);
-      this.log.info(`Response is: ${response}`)
+      this.log.debug(`Response is: ${response}`)
       const anglePos = response.indexOf('>');
-      this.log.info(`anglePos is: ${anglePos}`)
+      this.log.debug(`anglePos is: ${anglePos}`)
 
-      // return anglePos !== -1 && anglePos === (response.length - 1);
       return anglePos !== -1;
     }
     catch (e) {
@@ -259,9 +243,6 @@ class Transport extends EventEmitter {
     }
   }
 
-  _onBackoffStarted(delay) {
-    this.log.info(`Attempting to reconnect in ${delay / 1000} seconds.`);
-  }
 
   async _connect() {
     if (await this._synchronize() === true) {
