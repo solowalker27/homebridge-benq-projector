@@ -27,7 +27,7 @@ class BenQProjector {
         this.queue = [];
         this.callbackQueue = [];
         this.ready = true;
-        this.pollingInterval = config.pollingInterval || 10000;
+        this.pollingInterval = config.pollingInterval || 3000;
         this.lastKnownSource = 0;
         this.state = false;
         this.mute = false;
