@@ -1,6 +1,6 @@
 {
   "name": "homebridge-benq-projector",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Homebridge plugin for BenQ projectors",
   "main": "index.js",
   "devDependencies": {},
