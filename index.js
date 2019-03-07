@@ -5,7 +5,7 @@
 // var SerialPort = require("serialport");
 var Service, Characteristic;
 const Transport = require('./Transport');
-var package = require('./package.json');
+var version = require('./package.json').version;
 
 module.exports = function(homebridge) {
     Service = homebridge.hap.Service;
@@ -488,7 +488,7 @@ class BenQProjector {
         .setCharacteristic(Characteristic.Manufacturer, "BenQ")
         .setCharacteristic(Characteristic.Model, this.model)
         .setCharacteristic(Characteristic.SerialNumber, this.adapter)
-        .setCharacteristic(Characteristic.FirmwareRevision, package.version);
+        .setCharacteristic(Characteristic.FirmwareRevision, version);
 
         this.enabledServices.push(informationService);
 
