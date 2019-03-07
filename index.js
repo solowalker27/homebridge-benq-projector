@@ -426,37 +426,22 @@ class BenQProjector {
     }
 
     addSources(service) {
-      // If input name mappings are provided, use them.
-      // Else, load all inputs from query (useful for finding inputs to map).
+      this.log.info(this.inputs)
       this.inputs.forEach((i, x) =>  {
-        if (this.inputs) {
-          if (this.inputs[i['label']]) {
-            var inputName = this.inputs[i['label']]
-            let tmpInput = new Service.InputSource(inputName, 'inputSource' + x);
-            tmpInput
-              .setCharacteristic(Characteristic.Identifier, x)
-              .setCharacteristic(Characteristic.ConfiguredName, inputName)
-              .setCharacteristic(Characteristic.IsConfigured, Characteristic.IsConfigured.CONFIGURED)
-              .setCharacteristic(Characteristic.InputSourceType, Characteristic.InputSourceType.APPLICATION);
-        
-            service.addLinkedService(tmpInput);
-            this.enabledServices.push(tmpInput);
-          }
-        } else {
           var inputName = i['label']
+          this.log.info(inputName)
           let tmpInput = new Service.InputSource(inputName, 'inputSource' + x);
           tmpInput
             .setCharacteristic(Characteristic.Identifier, x)
             .setCharacteristic(Characteristic.ConfiguredName, inputName)
             .setCharacteristic(Characteristic.IsConfigured, Characteristic.IsConfigured.CONFIGURED)
             .setCharacteristic(Characteristic.InputSourceType, Characteristic.InputSourceType.APPLICATION);
-    
+      
           service.addLinkedService(tmpInput);
           this.enabledServices.push(tmpInput);
-        }
       })
-    
     }
+      
 
     prepareTvSpeakerService() {
 
