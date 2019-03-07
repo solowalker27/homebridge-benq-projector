@@ -25,7 +25,15 @@ npm install -g homebridge-benq-projector
       "accessory": "BenQ-Projector",
       "name": "Projector",
       "model": "W1070",
-      "adapter": "/dev/ttyUSB0"
+      "adapter": "/dev/ttyUSB0",
+      "inputs": [
+        {"input": "hdmi", "label": "Apple TV"},
+        {"input": "RGB", "label": "Computer"},
+        {"input": "ypbr", "label": "Component"},
+        {"input": "hdmi2", "label": "Raspberry Pi"},
+        {"input": "vid", "label": "Composite"},
+        {"input": "svid", "label": "S-Video"}
+      ] 
 }],
  "platforms": [
     ...
