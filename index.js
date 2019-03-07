@@ -19,9 +19,8 @@ class BenQProjector {
     // Configuration
     constructor(log, config) {
         this.name = config['name'];
-        this.model = config['model'];
+        this.model = config['model'] || "-";
         this.adapter = config['adapter'];
-        this.inputs = config['inputs'];
         
         this.timeout = config.timeout || 1000;
         this.queue = [];
@@ -62,7 +61,7 @@ class BenQProjector {
         [Characteristic.RemoteKey.INFORMATION]: "\r*menu=on#",
         };
 
-        this.default_inputs = [
+        this.inputs = config['inputs'] || [
         {"input": "hdmi", "label": "HDMI 1"},
         {"input": "RGB", "label": "COMPUTER/YPbPr"},
         {"input": "ypbr", "label": "Component"},
@@ -162,7 +161,7 @@ class BenQProjector {
         this.log.debug(response);
         this.log.debug("getInput lower:");
         this.log.debug(response.toLowerCase());
-        this.default_inputs.forEach((i, x) =>  {
+        this.inputs.forEach((i, x) =>  {
           this.log.debug(i.input);
           this.log.debug(response.toLowerCase().indexOf(i.input.toLowerCase() +"#"));
             if (response.toLowerCase().indexOf(i.input.toLowerCase() +"#") > -1) {
@@ -381,7 +380,7 @@ class BenQProjector {
     async setInputSource(source, callback) {
         this.log.debug(`Set projector Input to ${source}`);
         var cmd = this.commands['Source Set'];
-        var input = this.default_inputs[source];
+        var input = this.inputs[source];
         this.log.info("Setting input to %s", input['label']);
         cmd = cmd + input['input'] + "#";
 
@@ -429,7 +428,7 @@ class BenQProjector {
     addSources(service) {
       // If input name mappings are provided, use them.
       // Else, load all inputs from query (useful for finding inputs to map).
-      this.default_inputs.forEach((i, x) =>  {
+      this.inputs.forEach((i, x) =>  {
         if (this.inputs) {
           if (this.inputs[i['label']]) {
             var inputName = this.inputs[i['label']]
