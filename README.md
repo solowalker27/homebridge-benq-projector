@@ -2,7 +2,7 @@
 Homebridge plugin for BenQ projectors via serial RS232 as HomeKit TVs. Requires iOS >=12.2 and homebridge >=0.4.46.
 
 ## Description
-This plugin connects to a BenQ projector via serial RS232. Developed and tested using a Raspberry Pi and a USB to serial RS232 cable. Most of the serial code (`Transport.js`) sourced from [homebridge-epson-rs232](https://github.com/grover/homebridge-epson-projector-rs232). [homebridge-marantz-rs232](https://github.com/rooi/homebridge-marantz-rs232) was also referenced.
+This plugin connects to a BenQ projector via serial RS232. Developed and tested using a Raspberry Pi and a USB to serial RS232 cable to connect to a BenQ W1070. Most of the serial code (`Transport.js`) sourced from [homebridge-epson-rs232](https://github.com/grover/homebridge-epson-projector-rs232). [homebridge-marantz-rs232](https://github.com/rooi/homebridge-marantz-rs232) was also referenced.
 
 ## Installation instructions
 
@@ -52,6 +52,23 @@ npm install -g homebridge-benq-projector
 | model | No | Projector model. Only displayed in accessory details in HomeKit. |
 | pollingInterval | No | Polling interval _(Default: 3s)_ |
 | inputs | No | List of inputs to populate in the TV interface in HomeKit. Must be `name` and `label` pair, where `name` is input according to the projector and `label` is how it will be listed in HomeKit. Label changes made in the Home app or elsewhere are not saved and must be defined here. If no list is provided, a default list is used of inputs supported by W1070. |
+
+## List of known possible inputs
+| **Input** | **Default Label/Interface** |
+|-----------|-----------------------------|
+| `hdmi` | HDMI 1 |
+| `RGB` | COMPUTER/YPbPr |
+| `ypbr` | Component |
+| `hdmi2` | HDMI 2 |
+| `vid` | Composite |
+| `svid` | S-Video |
+| `RGB2` | COMPUTER 2/YPbPr2 |
+| `dviA` | DVI-A |
+| `dvid` | DVI-D |
+| `network` | Network |
+| `usbdisplay` | USB Display |
+| `usbreader` | USB Reader |
+
 
 ## Known issues 
 
