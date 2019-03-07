@@ -9,7 +9,9 @@ This plugin connects to a BenQ projector via serial RS232. Developed and tested 
 1. Install [homebridge](https://github.com/nfarina/homebridge)
 2. Connect to projector via RS232
 3. Install this plugin:
-```npm install -g homebridge-benq-projector```
+```
+npm install -g homebridge-benq-projector
+```
 4. Update your config.json, following the example below
 
 ## Example accessory
