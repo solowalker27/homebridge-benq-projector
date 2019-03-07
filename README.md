@@ -2,14 +2,14 @@
 Homebridge plugin for BenQ projectors via serial RS232 as HomeKit TVs. Requires iOS >=12.2 and homebridge >=0.4.46.
 
 ## Description
-This plugin connects to a BenQ projector via serial RS232. Developed and tested using a Raspberry Pi and a USB to serial RS232 cable. Most of the serial code (`Transport.js`) sourced from [homebridge-epson-rs232] (https://github.com/grover/homebridge-epson-projector-rs232). [homebridge-marantz-rs232] (https://github.com/rooi/homebridge-marantz-rs232) was also referenced.
+This plugin connects to a BenQ projector via serial RS232. Developed and tested using a Raspberry Pi and a USB to serial RS232 cable. Most of the serial code (`Transport.js`) sourced from [homebridge-epson-rs232](https://github.com/grover/homebridge-epson-projector-rs232). [homebridge-marantz-rs232](https://github.com/rooi/homebridge-marantz-rs232) was also referenced.
 
 ## Installation instructions
 
 1. Install [homebridge](https://github.com/nfarina/homebridge)
 2. Connect to projector via RS232
 3. Install this plugin:
--  ```npm install -g homebridge-benq-projector```
+```npm install -g homebridge-benq-projector```
 4. Update your config.json, following the example below
 
 ## Example accessory
