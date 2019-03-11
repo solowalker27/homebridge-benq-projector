@@ -75,6 +75,12 @@ npm install -g homebridge-benq-projector
 - Occasional minor performance or stability issues. May result in delayed response from projector. In severe cases, the serial connection can get so out of sync a restart of homebridge might be necessary.
 
 ## Changelog
+v1.0.2:
+- Fixed user defined input list.
+
+v1.0.1:
+- Fixed a bug referencing package version as accessory firmware version.
+
 v1.0:
 - Initial release.
 
