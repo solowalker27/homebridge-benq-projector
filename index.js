@@ -22,16 +22,17 @@ class BenQProjector {
         this.model = config['model'] || "-";
         this.adapter = config['adapter'];
         
-        this.timeout = config.timeout || 1000;
+        // this.timeout = config.timeout || 1000;
         this.queue = [];
         this.callbackQueue = [];
         this.ready = true;
-        this.pollingInterval = config.pollingInterval || 3000;
+        this.pollingInterval = config.pollingInterval || 6000;
         this.lastKnownSource = 0;
         this.state = false;
         this.mute = false;
         this.volume = 0;
         
+        this._isReachable = false;
         this.log = log;
 
         this.enabledServices = [];
@@ -95,10 +96,24 @@ class BenQProjector {
     async _onConnected() {
         this.log.debug('Connected. Refreshing characteristics.');
         await this._refreshProjectorStatus();
+        this._setReachable(true);
     }
 
     _onDisconnected() {
         this.log.debug('Disconnected');
+        this._setReachable(false);
+    }
+
+    _setReachable(state) {
+      this.debug(`Reachable: ${state}`);
+      if (this._isReachable === state) {
+        return;
+      }
+  
+      this._isReachable = state;
+  
+      this._bridgingService.getCharacteristic(Characteristic.Reachable)
+        .updateValue(this._isReachable);
     }
 
     async _sendCommand(cmd) {
@@ -107,22 +122,16 @@ class BenQProjector {
 
         // Error handling
         if (response.indexOf("Block") > -1) {
-            this.log.debug("Block in response.")
-            // setTimeout(() => {
-            //     this._sendCommand(cmd);
-            //   }, this.pollingInterval);
+            this.log.warn("Block in response.")
         } 
-        if (response === ">") {
-            this.log.debug("Ready response returned. Retrying.")
-            setTimeout(() => {
-                this._sendCommand(cmd);
-              }, this.pollingInterval);
-        } 
+        // if (response === ">") {
+        //     this.log.debug("Ready response returned. Retrying.")
+        //     setTimeout(() => {
+        //         this._sendCommand(cmd);
+        //       }, this.pollingInterval);
+        // } 
         if (response === undefined) {
-            this.log.debug("Response was undefined. Retrying.")
-            setTimeout(() => {
-                this._sendCommand(cmd);
-              }, this.pollingInterval);
+            this.log.error("Response was undefined.")
         } 
 
         // Response handling
@@ -142,14 +151,14 @@ class BenQProjector {
     }
 
     handlePowResponse(response) {
-            if (response.indexOf("ON") > -1) {
-                this.log.debug('Power is On');
-                this.state = true;
-            }
-            if (response.indexOf("OFF") > -1) {
-                this.log.debug('Power is Off');
-                this.state = false;
-            }
+        if (response.indexOf("ON") > -1) {
+            this.log.debug('Power is On');
+            this.state = true;
+        }
+        if (response.indexOf("OFF") > -1) {
+            this.log.debug('Power is Off');
+            this.state = false;
+        }
         
         this.tvService
             .getCharacteristic(Characteristic.Active)
@@ -194,7 +203,7 @@ class BenQProjector {
     handleVolResponse(response) {
       if(response.indexOf("*VOL=") > -1) {
         var vol = Number(response.split('=')[1].split('#'));
-        this.log.info(vol)
+        this.log.debug(vol)
         if (vol) {
             this.volume = vol;
         }
@@ -238,6 +247,12 @@ class BenQProjector {
         }, this.pollingInterval);
     }
 
+    getBridgingStateService() {
+      this._bridgingService = new Service.BridgingState();
+      this._bridgingService.getCharacteristic(Characteristic.Reachable)
+        .updateValue(this._isReachable);
+      this.enabledServices.push(this._bridgingService);
+    }
 
     async getPowerState(callback) {
         try {
@@ -254,7 +269,7 @@ class BenQProjector {
         
 
     async setPowerState(value, callback) {
-
+        
         this.log.debug(`Set projector power state to ${value}`);
         try {
           if (value) {
@@ -266,22 +281,19 @@ class BenQProjector {
           }
     
           await this._sendCommand(cmd);
-          await this.getPowerState();
           this.state = value;
+          await this.getPowerState();
         }
         catch (e) {
           this.log.error(`Failed to set power state ${e}`);
         }
         if (callback) {
-            callback(null, value);
+          callback(null, this.state);
         }
     }
         
 
     async getMuteState(callback) {
-      if (callback) {
-        callback(null, this.mute);
-      }
       try {
           this.log.debug('Getting mute state.');
           await this._sendCommand(this.commands['Mute State']);
@@ -289,13 +301,13 @@ class BenQProjector {
       catch (e) {
           this.log.error(`Failed to get mute state: ${e}`);
       }
+      if (callback) {
+        callback(null, this.mute);
+      }
     }
         
 
     async setMuteState(value, callback) {
-        if (callback) {
-          callback(null, value);
-        }
         this.log.debug(`Set projector mute state to ${value}`);
         try {
           if (value) {
@@ -313,19 +325,22 @@ class BenQProjector {
         catch (e) {
           this.log.error(`Failed to set mute state ${e}`);
         }
+        if (callback) {
+          callback(null, this.mute);
+        }
     }
         
 
     async getVolume(callback) {
-        if (callback) {
-          callback(null, this.volume);
-        }
         try {
             this.log.debug('Getting volume state.')
             await this._sendCommand(this.commands['Volume State']);
         }
         catch (e) {
             this.log.error(`Failed to get volume state: ${e}`);
+        }
+        if (callback) {
+          callback(null, this.volume);
         }
     }
 
@@ -336,7 +351,7 @@ class BenQProjector {
         }
         this.getVolume();
         var volDiff = this.volume - value;
-        this.log.debug("Setting volume to %s", value);
+        this.log.info("Setting volume to %s", value);
         if (volDiff < 0) {
             while (volDiff < 0)
             this.setVolumeRelative(Characteristic.VolumeSelector.INCREMENT)
@@ -365,15 +380,15 @@ class BenQProjector {
     }
 
     async getInputSource(callback) {
+        if (callback) {
+          callback(null, this.lastKnownSource);
+        }
         this.log.debug("Getting source")
         try {
           await this._sendCommand(this.commands['Source Get']);
         }
         catch (e) {
           this.log.error(`Failed to refresh Input state: ${this.commands['Source Get']} => ${e}`);
-        }
-        if (callback) {
-          callback(null, this.lastKnownSource);
         }
     }
 
@@ -394,15 +409,13 @@ class BenQProjector {
         if (callback) {
           callback();
         }
-
     }
         
     async identify(callback) {
-        this.log.debug("Identify requested!");
+        if(callback) callback();
+        this.log.info("Identify requested!");
         
         await this.setPowerState(true); // turn on
-        
-        if(callback) callback();
     }
 
     async remoteKeyPress(button, callback) {
@@ -426,10 +439,10 @@ class BenQProjector {
     }
 
     addSources(service) {
-      this.log.info(this.inputs)
+      this.log.debug(this.inputs)
       this.inputs.forEach((i, x) =>  {
           var inputName = i['label']
-          this.log.info(inputName)
+          this.log.debug(inputName)
           let tmpInput = new Service.InputSource(inputName, 'inputSource' + x);
           tmpInput
             .setCharacteristic(Characteristic.Identifier, x)
@@ -503,6 +516,7 @@ class BenQProjector {
         
         this.enabledServices.push(this.tvService);
         this.prepareTvSpeakerService();
+        this.getBridgingStateService();
         return this.enabledServices;
     }
 

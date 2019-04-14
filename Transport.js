@@ -4,6 +4,7 @@
 const SerialPort = require('serialport');
 const EventEmitter = require('events').EventEmitter;
 
+const Backoff = require('backoff');
 const SequentialTaskQueue = require('sequential-task-queue').SequentialTaskQueue;
 
 const TransportStates = {
@@ -41,13 +42,22 @@ class Transport extends EventEmitter {
     this._port.on('error', this._onSerialPortFailed.bind(this));
     this._port.on('data', this._onSerialPortData.bind(this));
 
+    this._backoff = new Backoff.exponential({
+      initialDelay: 100,
+      maxDelay: 60000
+    });
+    this._backoff.on('backoff', this._onBackoffStarted.bind(this));
+    this._backoff.on('ready', this._connect.bind(this));
+
+
     this._taskQueue = new SequentialTaskQueue();
 
     this.state = TransportStates.DISCONNECTED;
   }
 
   _onSerialPortOpened() {
-    this._connect();
+    // this._connect();
+    this._onDisconnected();
   }
 
   _onSerialPortClosed(err) {
@@ -71,13 +81,17 @@ class Transport extends EventEmitter {
     this._handlePendingData();
   }
 
+  _onBackoffStarted(delay) {
+    this.log.debug(`Attempting to reconnect in ${delay / 1000} seconds.`);
+  }
+
   execute(cmd, timeout) {
     if (this.state !== TransportStates.CONNECTED) {
       throw new Error('Not connected');
     }
 
-    // Default timeout of 2s
-    timeout = timeout || 2000;
+    // Default timeout of 10s
+    timeout = timeout || 10000;
 
     // Append a \r to the string
     cmd = cmd + '\r';
@@ -178,11 +192,13 @@ class Transport extends EventEmitter {
   }
 
   _onConnected() {
-    this.log.info('Connected to projector...');
+    this.log.debug('Connected to projector...');
+    this._backoff.reset();
   }
 
   _onDisconnected() {
     this.log.debug('Disconnected from projector...');
+    this._backoff.backoff();
   }
 
   async _synchronize() {
@@ -194,7 +210,7 @@ class Transport extends EventEmitter {
 
       synchronized = await this._sendNullCommand();
       if (synchronized === false) {
-        await this._createTimeout(1000);
+        await this._createTimeout(2000);
       }
     }
 
