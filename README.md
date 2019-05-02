@@ -1,4 +1,4 @@
-# homebridge-benq-projector v1.0.3
+# homebridge-benq-projector v1.0.4
 Homebridge plugin for BenQ projectors via serial RS232 as HomeKit TVs. Requires iOS >=12.2 and homebridge >=0.4.46.
 
 ## Description
@@ -76,6 +76,9 @@ npm install -g homebridge-benq-projector
 - As of v1.0.3 there are no known issues. Performance isn't perfect but that seems to be the nature of this type of connection.
 
 ## Changelog
+v1.0.4:
+- Fixed typo in debug logging that could cause accessory to become unresponsive.
+
 v1.0.3:
 - Fixed stability issues by reintroducing some things originally removed from Transport.js. Partially fix and partially hide performance issues by doing callbacks sooner and freeing up HomeKit sooner.
 

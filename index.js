@@ -105,7 +105,7 @@ class BenQProjector {
     }
 
     _setReachable(state) {
-      this.debug(`Reachable: ${state}`);
+      this.log.debug(`Reachable: ${state}`);
       if (this._isReachable === state) {
         return;
       }
