@@ -513,6 +513,12 @@ class BenQProjector {
         this.tvService
             .getCharacteristic(Characteristic.RemoteKey)
             .on('set', this.remoteKeyPress.bind(this));
+
+        this.tvService
+            .getCharacteristic(Characteristic.PowerModeSelection)
+            .on('set', (newValue, callback) => {
+                this.remoteKeyPress(Characteristic.RemoteKey.INFORMATION, callback);
+            });
         
         this.enabledServices.push(this.tvService);
         this.prepareTvSpeakerService();
