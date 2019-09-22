@@ -448,7 +448,8 @@ class BenQProjector {
             .setCharacteristic(Characteristic.Identifier, x)
             .setCharacteristic(Characteristic.ConfiguredName, inputName)
             .setCharacteristic(Characteristic.IsConfigured, Characteristic.IsConfigured.CONFIGURED)
-            .setCharacteristic(Characteristic.InputSourceType, Characteristic.InputSourceType.APPLICATION);
+            .setCharacteristic(Characteristic.InputSourceType, Characteristic.InputSourceType.APPLICATION)
+            .setCharacteristic(Characteristic.CurrentVisibilityState, Characteristic.CurrentVisibilityState.SHOWN);
       
           service.addLinkedService(tmpInput);
           this.enabledServices.push(tmpInput);
@@ -498,8 +499,6 @@ class BenQProjector {
         this.tvService
           .setCharacteristic(Characteristic.SleepDiscoveryMode, Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE);
       
-        this.addSources(this.tvService)
-
         this.tvService
             .getCharacteristic(Characteristic.Active)
             .on('get', this.getPowerState.bind(this))
@@ -513,9 +512,16 @@ class BenQProjector {
         this.tvService
             .getCharacteristic(Characteristic.RemoteKey)
             .on('set', this.remoteKeyPress.bind(this));
+          
+        this.tvService
+            .getCharacteristic(Characteristic.PowerModeSelection)
+            .on('set', (newValue, callback) => {
+                this.remoteKeyPress(Characteristic.RemoteKey.INFORMATION, callback);
+            });
         
         this.enabledServices.push(this.tvService);
         this.prepareTvSpeakerService();
+        this.addSources(this.tvService)
         this.getBridgingStateService();
         return this.enabledServices;
     }
