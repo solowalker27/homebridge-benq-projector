@@ -56,13 +56,14 @@ class Transport extends EventEmitter {
   }
 
   _onSerialPortOpened() {
-    // this._connect();
-    this._onDisconnected();
+    this._connect();
+    // this._onDisconnected();
   }
 
   _onSerialPortClosed(err) {
     this.log.error(`SignalPort closed: ${err}`);
     this._changeState(TransportStates.DISCONNECTED);
+    this._onDisconnected();
   }
 
   _onSerialPortFailed(err) {
@@ -180,6 +181,10 @@ class Transport extends EventEmitter {
 
       case TransportStates.CONNECTED:
         this._onConnected();
+        break;
+
+      case TransportStates.DISCONNECTED:
+        this._onDisconnected();
         break;
     }
 
