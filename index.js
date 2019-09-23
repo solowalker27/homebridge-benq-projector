@@ -24,7 +24,7 @@ class BenQProjector {
         
         // this.timeout = config.timeout || 1000;
         this.queue = [];
-        this.callbackQueue = [];
+        // this.callbackQueue = [];
         this.ready = true;
         this.pollingInterval = config.pollingInterval || 6000;
         this.lastKnownSource = 0;
@@ -255,6 +255,9 @@ class BenQProjector {
     }
 
     async getPowerState(callback) {
+        if (callback) {
+          callback(null, this.state);
+        }
         try {
             this.log.debug('Getting power state.');
             await this._sendCommand(this.commands['Power State']);
@@ -262,15 +265,16 @@ class BenQProjector {
         catch (e) {
             this.log.error(`Failed to get power state: ${e}`);
         }
-        if (callback) {
-          callback(null, this.state);
-        }
     }
         
 
     async setPowerState(value, callback) {
         
         this.log.debug(`Set projector power state to ${value}`);
+        this.state = value;
+        if (callback) {
+          callback(null, this.state);
+        }
         try {
           if (value) {
             var cmd = this.commands['Power On'];
@@ -281,19 +285,18 @@ class BenQProjector {
           }
     
           await this._sendCommand(cmd);
-          this.state = value;
-          await this.getPowerState();
+          // await this.getPowerState();
         }
         catch (e) {
           this.log.error(`Failed to set power state ${e}`);
-        }
-        if (callback) {
-          callback(null, this.state);
         }
     }
         
 
     async getMuteState(callback) {
+      if (callback) {
+        callback(null, this.mute);
+      }
       try {
           this.log.debug('Getting mute state.');
           await this._sendCommand(this.commands['Mute State']);
@@ -301,14 +304,15 @@ class BenQProjector {
       catch (e) {
           this.log.error(`Failed to get mute state: ${e}`);
       }
-      if (callback) {
-        callback(null, this.mute);
-      }
     }
         
 
     async setMuteState(value, callback) {
         this.log.debug(`Set projector mute state to ${value}`);
+        this.mute = value;
+        if (callback) {
+          callback(null, this.mute);
+        }
         try {
           if (value) {
             var cmd = this.commands['Mute On'];
@@ -320,27 +324,23 @@ class BenQProjector {
 
           await this._sendCommand(cmd);
           await this.getMuteState();
-          this.mute = value;
         }
         catch (e) {
           this.log.error(`Failed to set mute state ${e}`);
-        }
-        if (callback) {
-          callback(null, this.mute);
         }
     }
         
 
     async getVolume(callback) {
+        if (callback) {
+          callback(null, this.volume);
+        }
         try {
             this.log.debug('Getting volume state.')
             await this._sendCommand(this.commands['Volume State']);
         }
         catch (e) {
             this.log.error(`Failed to get volume state: ${e}`);
-        }
-        if (callback) {
-          callback(null, this.volume);
         }
     }
 
@@ -398,16 +398,15 @@ class BenQProjector {
         var input = this.inputs[source];
         this.log.info("Setting input to %s", input['label']);
         cmd = cmd + input['input'] + "#";
-
+        if (callback) {
+          callback();
+        }
         try {
           this.log.debug(`Sending setInputSource ${cmd}`);
           await this._sendCommand(cmd);
         }
         catch (e) {
           this.log.error(`Failed to set characteristic ${e}`);
-        }
-        if (callback) {
-          callback();
         }
     }
         
@@ -448,7 +447,7 @@ class BenQProjector {
             .setCharacteristic(Characteristic.Identifier, x)
             .setCharacteristic(Characteristic.ConfiguredName, inputName)
             .setCharacteristic(Characteristic.IsConfigured, Characteristic.IsConfigured.CONFIGURED)
-            .setCharacteristic(Characteristic.InputSourceType, Characteristic.InputSourceType.APPLICATION)
+            .setCharacteristic(Characteristic.InputSourceType, Characteristic.InputSourceType.HDMI)
             .setCharacteristic(Characteristic.CurrentVisibilityState, Characteristic.CurrentVisibilityState.SHOWN);
       
           service.addLinkedService(tmpInput);
@@ -456,7 +455,6 @@ class BenQProjector {
       })
     }
       
-
     prepareTvSpeakerService() {
 
       this.tvSpeakerService = new Service.TelevisionSpeaker(this.name + ' Volume', 'tvSpeakerService');
@@ -493,8 +491,10 @@ class BenQProjector {
 
         this.tvService = new Service.Television(this.name);
 
-        this.tvService
-          .setCharacteristic(Characteristic.ConfiguredName, this.name);
+        this.tvService.setCharacteristic(Characteristic.ConfiguredName, this.name)
+			  this.tvService.getCharacteristic(Characteristic.ConfiguredName).setProps({
+				  perms: [Characteristic.Perms.READ]
+        });
       
         this.tvService
           .setCharacteristic(Characteristic.SleepDiscoveryMode, Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE);
@@ -521,7 +521,7 @@ class BenQProjector {
         
         this.enabledServices.push(this.tvService);
         this.prepareTvSpeakerService();
-        this.addSources(this.tvService)
+        this.addSources(this.tvService);
         this.getBridgingStateService();
         return this.enabledServices;
     }
