@@ -521,7 +521,7 @@ class BenQProjector {
         
         this.enabledServices.push(this.tvService);
         this.prepareTvSpeakerService();
-        this.addSources(this.tvService)
+        this.addSources(this.tvService);
         this.getBridgingStateService();
         return this.enabledServices;
     }
