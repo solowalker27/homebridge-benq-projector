@@ -11,7 +11,7 @@ module.exports = function(homebridge) {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
     
-    homebridge.registerAccessory("homebridge-benq-projector", "BenQ-Projector", BenQProjector);
+    homebridge.registerAccessory("homebridge-benq-projector-w750", "BenQ-Projector", BenQProjector);
 }
     
     
@@ -21,7 +21,7 @@ class BenQProjector {
         this.name = config['name'];
         this.model = config['model'] || "-";
         this.adapter = config['adapter'];
-        
+		this.baudrate = config['baudrate'] || 115200;
         // this.timeout = config.timeout || 1000;
         this.queue = [];
         // this.callbackQueue = [];
@@ -82,7 +82,9 @@ class BenQProjector {
         /////////////////////////////
         // Setup Serial Connection //
         /////////////////////////////
-        this.serialPort = new Transport(this.adapter, this.log);
+		
+		
+        this.serialPort = new Transport(this.adapter, this.log, this.baudrate);		
         this.serialPort.on('connected', this._onConnected.bind(this));
         this.serialPort.on('disconnected', this._onDisconnected.bind(this));
   
