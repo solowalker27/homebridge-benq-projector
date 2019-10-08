@@ -11,7 +11,7 @@ module.exports = function(homebridge) {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
     
-    homebridge.registerAccessory("homebridge-benq-projector", "BenQ-Projector", BenQProjector);
+    homebridge.registerAccessory("homebridge-benq-projector-w750", "BenQ-Projector", BenQProjector);
 }
     
     
