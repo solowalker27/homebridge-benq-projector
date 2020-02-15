@@ -29,12 +29,12 @@
     "serial"
   ],
   "engines": {
-    "node": "^10.10.0",
+    "node": "^12.16.0",
     "homebridge": "^0.4.46"
   },
   "dependencies": {
     "sequential-task-queue": "^1.2.0",
-    "serialport": "^6.0.4",
+    "serialport": "^8.0.7",
     "backoff": "^2.5.0"
   }
 }
