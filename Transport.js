@@ -18,7 +18,7 @@ function noop() {
 
 class Transport extends EventEmitter {
 
-  constructor(port, log) {
+  constructor(port, log, baudrate) {
     super();
 
     this._currentRx = Buffer.alloc(0);
@@ -28,7 +28,7 @@ class Transport extends EventEmitter {
 
     this._port = new SerialPort(port, {
       autoOpen: true,
-      baudRate: 115200,
+      baudRate: baudrate,
       dataBits: 8,
       stopBits: 1,
       parity: 'none',
