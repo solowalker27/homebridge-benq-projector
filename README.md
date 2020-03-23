@@ -1,4 +1,4 @@
-# homebridge-benq-projector v1.0.5
+# homebridge-benq-projector v1.0.6
 Homebridge plugin for BenQ projectors via serial RS232 as HomeKit TVs. Requires iOS >=12.2 and homebridge >=0.4.46.
 
 ## Description
@@ -50,8 +50,9 @@ npm install -g homebridge-benq-projector
 | name | **Yes** | Name of the projector, how you want it to appear in HomeKit. |
 | adapter | **Yes** | Path to serial RS232 adapter. |
 | model | No | Projector model. Only displayed in accessory details in HomeKit. |
-| pollingInterval | No | Polling interval _(Default: 3s)_ |
-| inputs | No | List of inputs to populate in the TV interface in HomeKit. Must be `name` and `label` pair, where `name` is input according to the projector and `label` is how it will be listed in HomeKit. Label changes made in the Home app or elsewhere are not saved and must be defined here. If no list is provided, a default list is used of inputs supported by W1070. |
+| pollingInterval | No | Polling interval in milliseconds _(Default: 6000)_ |
+| inputs | No | List of inputs to populate in the TV interface in HomeKit. Must be `input` and `label` pair, where `input` is input according to the projector and `label` is how it will be listed in HomeKit. Label changes made in the Home app or elsewhere are not saved and must be defined here. If no list is provided, a default list is used of inputs supported by W1070. |
+| baudrate | No | baudrate for your device. Default is 115200.
 
 ## List of known possible inputs
 | **Input** | **Default Label/Interface** |
@@ -76,6 +77,11 @@ npm install -g homebridge-benq-projector
 - As of v1.0.3 there are no known issues. Performance isn't perfect but that seems to be the nature of this type of connection.
 
 ## Changelog
+v1.0.6
+- Upgrade dependencies (thanks @alehaa)
+- Add ability to configure baudrate (thanks @sir-bedevere)
+- Add config schema for homebridge-config-ui-x support
+
 v1.0.5:
 - Stability improvements and iOS 13 fix by adding services in the correct order (thanks @AlexanderBabel).
 

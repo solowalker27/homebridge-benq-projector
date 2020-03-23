@@ -21,7 +21,7 @@ class BenQProjector {
         this.name = config['name'];
         this.model = config['model'] || "-";
         this.adapter = config['adapter'];
-		this.baudrate = config['baudrate'] || 115200;
+        this.baudrate = config['baudrate'] || 115200;
         // this.timeout = config.timeout || 1000;
         this.queue = [];
         // this.callbackQueue = [];
