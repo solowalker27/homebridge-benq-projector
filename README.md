@@ -77,6 +77,9 @@ npm install -g homebridge-benq-projector
 - As of v1.0.3 there are no known issues. Performance isn't perfect but that seems to be the nature of this type of connection.
 
 ## Changelog
+v1.1.10
+- Switch from the borrowed Transport.js to serial-io package for serial communication. Should increase long term speed and stability.
+
 v1.0.6
 - Upgrade dependencies (thanks @alehaa)
 - Add ability to configure baudrate (thanks @sir-bedevere)

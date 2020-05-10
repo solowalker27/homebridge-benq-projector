@@ -4,7 +4,7 @@
 
 // var SerialPort = require("serialport");
 var Service, Characteristic;
-const Transport = require('./Transport');
+const serialio = require('serial-io');
 var version = require('./package.json').version;
 
 module.exports = function(homebridge) {
@@ -79,77 +79,40 @@ class BenQProjector {
         // {"input": "usbdisplay", "label": "USB Display"},
         // {"input": "usbreader", "label": "USB Reader"}
         
-        /////////////////////////////
-        // Setup Serial Connection //
-        /////////////////////////////
-		
-		
-        this.serialPort = new Transport(this.adapter, this.log, this.baudrate);		
-        this.serialPort.on('connected', this._onConnected.bind(this));
-        this.serialPort.on('disconnected', this._onDisconnected.bind(this));
-  
+        // Start polling
+        this.refreshProjectorStatus();
     }
 
 
-    //////////////////////////////
-    // Serial Command Functions //
-    //////////////////////////////
-
-    async _onConnected() {
-        this.log.debug('Connected. Refreshing characteristics.');
-        await this._refreshProjectorStatus();
-        this._setReachable(true);
-    }
-
-    _onDisconnected() {
-        this.log.debug('Disconnected');
-        this._setReachable(false);
-    }
-
-    _setReachable(state) {
-      this.log.debug(`Reachable: ${state}`);
-      if (this._isReachable === state) {
-        return;
-      }
-  
-      this._isReachable = state;
-  
-      this._bridgingService.getCharacteristic(Characteristic.Reachable)
-        .updateValue(this._isReachable);
-    }
-
-    async _sendCommand(cmd) {
-        this.log.debug("_sendCommand: %s", cmd)
-        const response = await this.serialPort.execute(cmd);
-
-        // Error handling
-        if (response.indexOf("Block") > -1) {
+    /////////////////////////////
+    // Serial Command Function //
+    /////////////////////////////
+    sendCommand(command) {
+      this.log.debug("sendCommand: %s", command);
+      serialio.send(this.adapter, command, {baudrate:this.baudrate}).then(response =>
+        {
+          // Error handling
+          if (response.indexOf("Block") > -1) {
             this.log.warn("Block in response.")
-        } 
-        // if (response === ">") {
-        //     this.log.debug("Ready response returned. Retrying.")
-        //     setTimeout(() => {
-        //         this._sendCommand(cmd);
-        //       }, this.pollingInterval);
-        // } 
-        if (response === undefined) {
+          } 
+          if (response === undefined) {
             this.log.error("Response was undefined.")
-        } 
-
-        // Response handling
-        if (response.indexOf("*pow=") > -1) {
-          this.handlePowResponse(response);
+          }
+          // Response handling
+          if (response.indexOf("*pow=") > -1) {
+            this.handlePowResponse(response);
+          }
+          if (response.indexOf("*sour=") > -1) {
+            this.handleSourResponse(response);
+          }
+          if (response.indexOf("*mute=") > -1) {
+            this.handleMuteResponse(response);
+          }
+          if (response.indexOf("*vol=") > -1) {
+            this.handleVolResponse(response);
+          }
         }
-        if (response.indexOf("*sour=") > -1) {
-          this.handleSourResponse(response);
-        }
-        if (response.indexOf("*mute=") > -1) {
-          this.handleMuteResponse(response);
-        }
-        if (response.indexOf("*vol=") > -1) {
-          this.handleVolResponse(response);
-        }
-
+      );
     }
 
     handlePowResponse(response) {
@@ -220,22 +183,21 @@ class BenQProjector {
     }
 
 
-
     ///////////////////////////
     // Functions for HomeKit //
     ///////////////////////////
 
-    async _refreshProjectorStatus() {
+    refreshProjectorStatus() {
         this.log.debug('Refresh projector status');
     
         try {
             this.log.debug('Refreshing power state.');
-          await this.getPowerState();
+          this.getPowerState();
           this.log.debug('Power state refreshed.');
 
           if (this.state) {
             this.log.debug('Refreshing input source.');
-            await this.getInputSource();
+            this.getInputSource();
             this.log.debug('Input source refreshed.');
           }
         }
@@ -245,33 +207,24 @@ class BenQProjector {
     
         // Schedule another update
         setTimeout(() => {
-          this._refreshProjectorStatus();
+          this.refreshProjectorStatus();
         }, this.pollingInterval);
     }
 
-    getBridgingStateService() {
-      this._bridgingService = new Service.BridgingState();
-      this._bridgingService.getCharacteristic(Characteristic.Reachable)
-        .updateValue(this._isReachable);
-      this.enabledServices.push(this._bridgingService);
-    }
-
-    async getPowerState(callback) {
+    getPowerState(callback) {
         if (callback) {
           callback(null, this.state);
         }
         try {
             this.log.debug('Getting power state.');
-            await this._sendCommand(this.commands['Power State']);
+            this.sendCommand(this.commands['Power State']);
         }
         catch (e) {
             this.log.error(`Failed to get power state: ${e}`);
         }
     }
         
-
-    async setPowerState(value, callback) {
-        
+    setPowerState(value, callback) {
         this.log.debug(`Set projector power state to ${value}`);
         this.state = value;
         if (callback) {
@@ -286,7 +239,7 @@ class BenQProjector {
             this.log.info("Power Off");
           }
     
-          await this._sendCommand(cmd);
+          sendCommand(cmd);
           // await this.getPowerState();
         }
         catch (e) {
@@ -294,22 +247,20 @@ class BenQProjector {
         }
     }
         
-
-    async getMuteState(callback) {
+    getMuteState(callback) {
       if (callback) {
         callback(null, this.mute);
       }
       try {
           this.log.debug('Getting mute state.');
-          await this._sendCommand(this.commands['Mute State']);
+          sendCommand(this.commands['Mute State']);
       }
       catch (e) {
           this.log.error(`Failed to get mute state: ${e}`);
       }
     }
         
-
-    async setMuteState(value, callback) {
+    setMuteState(value, callback) {
         this.log.debug(`Set projector mute state to ${value}`);
         this.mute = value;
         if (callback) {
@@ -324,7 +275,7 @@ class BenQProjector {
             this.log.info("Mute Off");
           }
 
-          await this._sendCommand(cmd);
+          sendCommand(cmd);
           await this.getMuteState();
         }
         catch (e) {
@@ -332,22 +283,20 @@ class BenQProjector {
         }
     }
         
-
-    async getVolume(callback) {
+    getVolume(callback) {
         if (callback) {
           callback(null, this.volume);
         }
         try {
             this.log.debug('Getting volume state.')
-            await this._sendCommand(this.commands['Volume State']);
+            sendCommand(this.commands['Volume State']);
         }
         catch (e) {
             this.log.error(`Failed to get volume state: ${e}`);
         }
     }
 
-
-    async setVolumeState(value, callback) {
+    setVolumeState(value, callback) {
         if (callback) {
           callback(null, this.volume);
         }
@@ -363,7 +312,7 @@ class BenQProjector {
         }
     }
 
-    async setVolumeRelative(volumeDirection, callback) {
+    setVolumeRelative(volumeDirection, callback) {
         if (callback) {
           callback();
         }
@@ -378,23 +327,23 @@ class BenQProjector {
         that.log.error( "setVolumeRelative - VOLUME : ERROR - unknown direction sent");
       }
       
-      await this._sendCommand(cmd)
+      sendCommand(cmd)
     }
 
-    async getInputSource(callback) {
+    getInputSource(callback) {
         if (callback) {
           callback(null, this.lastKnownSource);
         }
         this.log.debug("Getting source")
         try {
-          await this._sendCommand(this.commands['Source Get']);
+          sendCommand(this.commands['Source Get']);
         }
         catch (e) {
           this.log.error(`Failed to refresh Input state: ${this.commands['Source Get']} => ${e}`);
         }
     }
 
-    async setInputSource(source, callback) {
+    setInputSource(source, callback) {
         this.log.debug(`Set projector Input to ${source}`);
         var cmd = this.commands['Source Set'];
         var input = this.inputs[source];
@@ -405,21 +354,21 @@ class BenQProjector {
         }
         try {
           this.log.debug(`Sending setInputSource ${cmd}`);
-          await this._sendCommand(cmd);
+          sendCommand(cmd);
         }
         catch (e) {
           this.log.error(`Failed to set characteristic ${e}`);
         }
     }
         
-    async identify(callback) {
+    identify(callback) {
         if(callback) callback();
         this.log.info("Identify requested!");
         
-        await this.setPowerState(true); // turn on
+        this.setPowerState(true); // turn on
     }
 
-    async remoteKeyPress(button, callback) {
+    remoteKeyPress(button, callback) {
       this.log.debug(button)
       if (callback) {
         callback();
@@ -428,7 +377,7 @@ class BenQProjector {
         var press = this.buttons[button]
         this.log.info("Pressing remote key %s", button);
         try {
-          await this._sendCommand(press);
+          sendCommand(press);
         } catch (e) {
           this.log.error(`Failed to press remote key: ${e}`);
         }
@@ -458,7 +407,6 @@ class BenQProjector {
     }
       
     prepareTvSpeakerService() {
-
       this.tvSpeakerService = new Service.TelevisionSpeaker(this.name + ' Volume', 'tvSpeakerService');
       this.tvSpeakerService
           .setCharacteristic(Characteristic.Active, Characteristic.Active.ACTIVE)
@@ -480,7 +428,6 @@ class BenQProjector {
     }
         
     getServices() {
-        
         var informationService = new Service.AccessoryInformation();
         informationService
         .setCharacteristic(Characteristic.Name, this.name)
@@ -524,8 +471,6 @@ class BenQProjector {
         this.enabledServices.push(this.tvService);
         this.prepareTvSpeakerService();
         this.addSources(this.tvService);
-        this.getBridgingStateService();
         return this.enabledServices;
     }
-
 };
