@@ -240,7 +240,6 @@ class BenQProjector {
           }
     
           sendCommand(cmd);
-          // await this.getPowerState();
         }
         catch (e) {
           this.log.error(`Failed to set power state ${e}`);
@@ -276,7 +275,7 @@ class BenQProjector {
           }
 
           sendCommand(cmd);
-          await this.getMuteState();
+          this.getMuteState();
         }
         catch (e) {
           this.log.error(`Failed to set mute state ${e}`);
