@@ -30,7 +30,7 @@ class BenQProjector {
         this.volume = 0;
         
         this._isReachable = false;
-        this.log = log;
+        this._log = log;
 
         this.enabledServices = [];
 
@@ -80,12 +80,26 @@ class BenQProjector {
         this.refreshProjectorStatus();
     }
 
+    log(level, line) {
+      if (level === "info") {
+        this._log.info(JSON.stringify(line));
+      }
+      if (level === "error") {
+        this._log.error(JSON.stringify(line));
+      }
+      if (level === "warn") {
+        this._log.warn(JSON.stringify(line));
+      }
+      if (level === "debug") {
+        this._log.debug(JSON.stringify(line));
+      }
+    }
 
     /////////////////////////////
     // Serial Command Function //
     /////////////////////////////
     sendCommand(command) {
-      this.log.debug("sendCommand: " + command.replace(/[\\$'"]/g, "\\$&"));
+      this.log("debug", "sendCommand: " + command.replace(/[\\$'"]/g, "\\$&"));
       // return new Promise((resolve, reject) => {
       //   serialport.list((err, ports) => {
       //     if (err) {
@@ -97,14 +111,14 @@ class BenQProjector {
       // })
       return new Promise(function(resolve, reject){
           serialio.send(this.adapter, command, {baudRate:this.baudrate}).then(response => {
-          this.log.debug(`Response came back: ${response}`)
+          this.log("debug", `Response came back: ${response}`)
           // Error handling
           if (response.indexOf("Block") > -1) {
-            this.log.warn("Block in response.")
+            this.log("warn", "Block in response.")
             reject();
           } 
           if (response === undefined) {
-            this.log.error("Response was undefined.")
+            this.log("error", "Response was undefined.")
             reject();
           }
           // Response handling
@@ -125,7 +139,7 @@ class BenQProjector {
             resolve();
           }
         }).catch(error => {
-          this.log.error(`Sending command encountered error: ${error}`)
+          this.log("error", `Sending command encountered error: ${error}`)
           reject();
         });
       })
@@ -134,11 +148,11 @@ class BenQProjector {
 
     handlePowResponse(response) {
         if (response.indexOf("ON") > -1) {
-            this.log.debug('Power is On');
+            this.log("debug", 'Power is On');
             this.state = true;
         }
         if (response.indexOf("OFF") > -1) {
-            this.log.debug('Power is Off');
+            this.log("debug", 'Power is Off');
             this.state = false;
         }
         
@@ -148,21 +162,14 @@ class BenQProjector {
     }
 
     handleSourResponse(response) {
-        this.log.debug("getInput response:");
-        this.log.debug(response);
-        this.log.debug("getInput lower:");
-        this.log.debug(response.toLowerCase());
+        this.log("debug", `getInput response: ${response}`);
         this.inputs.forEach((i, x) =>  {
-          this.log.debug(i.input);
-          this.log.debug(response.toLowerCase().indexOf(i.input.toLowerCase() +"#"));
             if (response.toLowerCase().indexOf(i.input.toLowerCase() +"#") > -1) {
             this.lastKnownSource = x;
-            this.log.debug("Input is %s", i.input);
-
+            this.log("debug", "Input is %s", i.input);
             }
         })
-        this.log.debug("Setting ActiveIdentifier to:");
-        this.log.debug(this.lastKnownSource);
+        this.log("debug", `Setting ActiveIdentifier to: ${this.lastKnownSource}`);
         this.tvService
             .getCharacteristic(Characteristic.ActiveIdentifier)
             .updateValue(this.lastKnownSource);
@@ -170,11 +177,11 @@ class BenQProjector {
 
     handleMuteResponse(response) {
         if (response.indexOf("ON") > -1) {
-            this.log.debug('Mute is On');
+            this.log("debug", 'Mute is On');
             this.mute = true;
         }
         if (response.indexOf("OFF") > -1) {
-            this.log.debug('Mute is Off');
+            this.log("debug", 'Mute is Off');
             this.mute = false;
         }
         this.tvSpeakerService
@@ -185,7 +192,7 @@ class BenQProjector {
     handleVolResponse(response) {
       if(response.indexOf("*VOL=") > -1) {
         var vol = Number(response.split('=')[1].split('#'));
-        this.log.debug(vol)
+        this.log("debug", `Volume is: ${vol}`)
         if (vol) {
             this.volume = vol;
         }
@@ -196,7 +203,7 @@ class BenQProjector {
         }
       }
 
-      this.log.debug("Volume is: %n", this.volume)
+      this.log("debug", "Volume is: %n", this.volume)
     }
 
 
@@ -205,20 +212,20 @@ class BenQProjector {
     ///////////////////////////
 
     refreshProjectorStatus() {
-        this.log.debug('Refresh projector status');
+        this.log("debug", 'Refresh projector status');
     
         try {
-          this.log.debug('Refreshing power state.');
+          this.log("debug", 'Refreshing power state.');
           this.getPowerState();
-          this.log.debug('Power state refreshed.');
+          this.log("debug", 'Power state refreshed.');
           if (this.state) {
-            this.log.debug('Refreshing input source.');
+            this.log("debug", 'Refreshing input source.');
             this.getInputSource();
-            this.log.debug('Input source refreshed.');
+            this.log("debug", 'Input source refreshed.');
           }
         }
         catch (e) {
-          this.log.error(`Failed to refresh projector status: ${e}`);
+          this.log("error", `Failed to refresh projector status: ${e}`);
         }
     
         // Schedule another update
@@ -228,89 +235,86 @@ class BenQProjector {
     }
 
     getPowerState(callback) {
-        this.log.debug('Getting power state.');
-        if (callback) {
-          callback(null, this.state);
-        }
+        this.log("debug", 'Getting power state.');
         serialio.send(this.adapter, this.commands['Power State'], {baudRate:this.baudrate}).then(response => {
           this.handlePowResponse(response);
         }).catch(error => {
-          this.log.error(`Failed to get power state: ${error}`)
+          this.log("error", `Failed to get power state: ${error}`)
         });
-    }
-        
-    setPowerState(value, callback) {
-        this.log.debug(`Set projector power state to ${value}`);
         if (callback) {
           callback(null, this.state);
         }
+    }
+        
+    setPowerState(value, callback) {
+        this.log("debug", `Set projector power state to ${value}`);
         this.state = value;
         if (value) {
           var cmd = this.commands['Power On'];
-          this.log.info("Power On");
+          this.log("info", "Power On");
         } else {
           var cmd = this.commands['Power Off'];
-          this.log.info("Power Off");
+          this.log("info", "Power Off");
         }
         
         serialio.send(this.adapter, cmd, {baudRate:this.baudrate}).then(response => {
           this.handlePowResponse(response);
         }).catch (e => {
-        this.log.error(`Failed to set power state ${e}`);
+        this.log("error", `Failed to set power state ${e}`);
       })
+      if (callback) {
+        callback(null, this.state);
+      }
     }
         
     getMuteState(callback) {
-          this.log.debug('Getting mute state.');
-          if (callback) {
-            callback(null, this.mute);
-          }
+          this.log("debug", 'Getting mute state.');
           serialio.send(this.adapter, this.commands['Mute State'], {baudRate:this.baudrate}).then(response => {
             this.handleMuteResponse(response);
           }).catch (e => {
-          this.log.error(`Failed to get mute state: ${e}`);
+          this.log("errror", `Failed to get mute state: ${e}`);
       })
+      if (callback) {
+        callback(null, this.mute);
+      }
     }
         
     setMuteState(value, callback) {
-        this.log.debug(`Set projector mute state to ${value}`);
+        this.log("debug", `Set projector mute state to ${value}`);
         this.mute = value;
-        if (callback) {
-          callback(null, this.mute);
-        }
           if (value) {
             var cmd = this.commands['Mute On'];
-            this.log.info("Mute On")
+            this.log("info", "Mute On")
           } else {
             var cmd = this.commands['Mute Off'];
-            this.log.info("Mute Off");
+            this.log("info", "Mute Off");
           }
           serialio.send(this.adapter, cmd, {baudRate:this.baudrate}).then(response => {
           this.handleMuteResponse(response);
           }).catch (e => {
-          this.log.error(`Failed to set mute state ${e}`);
+          this.log("error", `Failed to set mute state ${e}`);
         })
+        if (callback) {
+          callback(null, this.mute);
+        }
     }
         
     getVolume(callback) {
-            this.log.debug('Getting volume state.')
-            if (callback) {
-              callback(null, this.volume);
-            }
+            this.log("debug", 'Getting volume state.')
             serialio.send(this.adapter, this.commands['Volume State'], {baudRate:this.baudrate}).then(response => {
               this.handleVolResponse(response);
             }).catch (e => {
-            this.log.error(`Failed to get volume state: ${e}`);
+            this.log("error", `Failed to get volume state: ${e}`);
         })
+        if (callback) {
+          callback(null, this.volume);
+        }
     }
 
     setVolumeState(value, callback) {
-      if (callback) {
-        callback(null, this.volume);
-      }
         this.getVolume().then(function(){
           var volDiff = this.volume - value;
-          this.log.info("Setting volume to %s", value);
+          this.log("info", "Setting volume to %s", value);
           if (volDiff < 0) {
               while (volDiff < 0)
               this.setVolumeRelative(Characteristic.VolumeSelector.INCREMENT)
@@ -319,20 +323,19 @@ class BenQProjector {
               this.setVolumeRelative(Characteristic.VolumeSelector.DECREMENT)
           }
         })
-        
+        if (callback) {
+          callback(null, this.volume);
+        }
     }
 
     setVolumeRelative(volumeDirection, callback) {
-      if (callback) {
-        callback();
-      }
         // Change volume by pressing Volume Up or Volume Down
       if (volumeDirection === Characteristic.VolumeSelector.INCREMENT) {
         var cmd = this.commands['Volume Up'];
-        this.log.info("Volume Up")
+        this.log("info", "Volume Up")
       } else if (volumeDirection === Characteristic.VolumeSelector.DECREMENT) {
         var cmd = this.commands['Volume Down'];
-        this.log.info("Volume Down")
+        this.log("info", "Volume Down")
       } else {
         that.log.error( "setVolumeRelative - VOLUME : ERROR - unknown direction sent");
       }
@@ -340,66 +343,72 @@ class BenQProjector {
       serialio.send(this.adapter, cmd, {baudRate:this.baudrate}).then(response => {
         this.handleVolResponse(response);
       }).catch(e => {
-        this.log.error(`Failed to set volume: ${e}`)
+        this.log("error", `Failed to set volume: ${e}`)
       });
+      if (callback) {
+        callback();
+      }
     }
 
     getInputSource(callback) {
-      if (callback) {
-        callback(null, this.lastKnownSource);
-      }
-        this.log.debug("Getting source")
+      if (this.state) {
+        this.log("debug", "Getting source")
           serialio.send(this.adapter, this.commands['Source Get'], {baudRate:this.baudrate}).then(response => {
             this.handleSourResponse(response);
           }).catch (e => {
-          this.log.error(`Failed to refresh Input state: ${this.commands['Source Get']} => ${e}`);
+          this.log("error", `Failed to refresh Input state: ${this.commands['Source Get']} => ${e}`);
         })
+      }
+        if (callback) {
+          callback(null, this.lastKnownSource);
+        }
     }
 
     setInputSource(source, callback) {
-        this.log.debug(`Set projector Input to ${source}`);
-        if (callback) {
-          callback();
-        }
+        this.log("debug", `Set projector Input to ${source}`);
         var cmd = this.commands['Source Set'];
         var input = this.inputs[source];
-        this.log.info("Setting input to %s", input['label']);
+        this.log("info", "Setting input to %s", input['label']);
         cmd = cmd + input['input'] + "#";
-          this.log.debug(`Sending setInputSource ${cmd}`);
+          this.log("debug", `Sending setInputSource ${cmd}`);
           serialio.send(this.adapter, cmd, {baudRate:this.baudrate}).then(response => {
             this.handleSourResponse(response);
           }).catch (e => {
-          this.log.error(`Failed to set characteristic ${e}`);
+          this.log("error", `Failed to set characteristic ${e}`);
         })
+        if (callback) {
+          callback();
+        }
     }
         
     identify(callback) {
-        this.log.info("Identify requested!");
-        
-        this.setPowerState(true); // turn on
+        this.log("info", "Identify requested!");
+        this.setPowerState(true);
+        if (callback) {
+          callback();
+        } // turn on
     }
 
     remoteKeyPress(button, callback) {
-      if(callback) callback();
-      this.log.debug(button)
+      this.log("debug", button)
       if (this.buttons[button]) {
         var press = this.buttons[button]
-        this.log.info("Pressing remote key %s", button);
+        this.log("info", "Pressing remote key %s", button);
           serialio.send(this.adapter, press, {baudRate:this.baudrate}).then().catch (e => {
-          this.log.error(`Failed to press remote key: ${e}`);
+          this.log("error", `Failed to press remote key: ${e}`);
         })
       } else {
-        this.log.error('Remote button %d not supported.', button)
+        this.log("error", 'Remote button %d not supported.', button)
         return
       }
-      
+      if(callback) callback();
     }
 
     addSources(service) {
-      this.log.debug(this.inputs)
+      this.log("debug", this.inputs)
       this.inputs.forEach((i, x) =>  {
           var inputName = i['label']
-          this.log.debug(inputName)
+          this.log("debug", inputName)
           let tmpInput = new Service.InputSource(inputName, 'inputSource' + x);
           tmpInput
             .setCharacteristic(Characteristic.Identifier, x)
