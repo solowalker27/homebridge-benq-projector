@@ -35,28 +35,28 @@ class BenQProjector {
         this.enabledServices = [];
 
         this.commands = {
-            "Power On": "\r*pow=on#",
-            "Power Off": "\r*pow=off#",
-            "Power State": "\r*pow=?#",
-            "Mute On": "\r*mute=on#",
-            "Mute Off": "\r*mute=off#",
-            "Mute State": "\r*mute=?#",
-            "Volume Up": "\r*vol=+#",
-            "Volume Down": "\r*vol=-#",
-            "Volume State": "\r*vol=?#",
-            "Source Set": "\r*sour=",
-            "Source Get": "\r*sour=?#"
+            "Power On": "\r*pow=on#\r",
+            "Power Off": "\r*pow=off#\r",
+            "Power State": "\r*pow=?#\r",
+            "Mute On": "\r*mute=on#\r",
+            "Mute Off": "\r*mute=off#\r",
+            "Mute State": "\r*mute=?#\r",
+            "Volume Up": "\r*vol=+#\r",
+            "Volume Down": "\r*vol=-#\r",
+            "Volume State": "\r*vol=?#\r",
+            "Source Set": "\r*sour=\r",
+            "Source Get": "\r*sour=?#\r"
         };
 
         this.buttons = {
-        [Characteristic.RemoteKey.ARROW_UP]: "\r*up#",
-        [Characteristic.RemoteKey.ARROW_DOWN]: "\r*down#",
-        [Characteristic.RemoteKey.ARROW_LEFT]: "\r*left#",
-        [Characteristic.RemoteKey.ARROW_RIGHT]: "\r*right#",
-        [Characteristic.RemoteKey.SELECT]: "\r*enter#",
-        [Characteristic.RemoteKey.BACK]: "\r*menu=off#",
-        [Characteristic.RemoteKey.EXIT]: "\r*menu=on#",
-        [Characteristic.RemoteKey.INFORMATION]: "\r*menu=on#",
+        [Characteristic.RemoteKey.ARROW_UP]: "\r*up#\r",
+        [Characteristic.RemoteKey.ARROW_DOWN]: "\r*down#\r",
+        [Characteristic.RemoteKey.ARROW_LEFT]: "\r*left#\r",
+        [Characteristic.RemoteKey.ARROW_RIGHT]: "\r*right#\r",
+        [Characteristic.RemoteKey.SELECT]: "\r*enter#\r",
+        [Characteristic.RemoteKey.BACK]: "\r*menu=off#\r",
+        [Characteristic.RemoteKey.EXIT]: "\r*menu=on#\r",
+        [Characteristic.RemoteKey.INFORMATION]: "\r*menu=on#\r",
         };
 
         this.inputs = config['inputs'] || [
@@ -107,7 +107,7 @@ class BenQProjector {
       //   })
       // new Promise(function(resolve, reject){
           serialio.send(this.adapter, command, {baudRate:this.baudrate, timeoutRolling:10000}).then(response => {
-          this.log.info(`Response came back: ${response}`)
+          this.log.debug(`Response came back: ${response}`)
           // Error handling
           if (response.indexOf("Block") > -1) {
             this.log.warn("Block in response.")
@@ -128,6 +128,8 @@ class BenQProjector {
           if (response.indexOf("*vol=") > -1) {
             this.handleVolResponse(response);
           }
+        }).catch(error => {
+          this.log.error(`Sending command encountered error: ${error}`)
         });
         
     }
