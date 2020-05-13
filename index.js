@@ -20,16 +20,12 @@ class BenQProjector {
         this.adapter = config['adapter'];
         this.baudrate = config['baudrate'] || 115200;
         // this.timeout = config.timeout || 1000;
-        this.queue = [];
-        // this.callbackQueue = [];
-        this.ready = true;
         this.pollingInterval = config.pollingInterval || 6000;
         this.lastKnownSource = 0;
         this.state = false;
         this.mute = false;
         this.volume = 0;
         
-        this._isReachable = false;
         this._log = log;
 
         this.enabledServices = [];
@@ -99,16 +95,7 @@ class BenQProjector {
     // Serial Command Function //
     /////////////////////////////
     sendCommand(command) {
-      this.log("debug", "sendCommand: " + command.replace(/[\\$'"]/g, "\\$&"));
-      // return new Promise((resolve, reject) => {
-      //   serialport.list((err, ports) => {
-      //     if (err) {
-      //       reject(new Error(err))
-      //     } else {
-      //       resolve(ports)
-      //     }
-      //   })
-      // })
+      this.log("debug", `sendCommand: ${command}`);
       return new Promise(function(resolve, reject){
           serialio.send(this.adapter, command, {baudRate:this.baudrate}).then(response => {
           this.log("debug", `Response came back: ${response}`)
