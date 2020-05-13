@@ -85,7 +85,7 @@ class BenQProjector {
     // Serial Command Function //
     /////////////////////////////
     sendCommand(command) {
-      this.log.debug("sendCommand: " + command);
+      this.log.debug("sendCommand: " + command.replace(/[\\$'"]/g, "\\$&"));
       // return new Promise((resolve, reject) => {
       //   serialport.list((err, ports) => {
       //     if (err) {
@@ -95,42 +95,40 @@ class BenQProjector {
       //     }
       //   })
       // })
-      // let connection
-      // return new Connection(portName, opts)
-      //   .then(conn => {
-      //     connection = conn
-      //     return connection.send(content, opts)
-      //   })
-      //   .then(response => {
-      //     connection.close()
-      //     return response
-      //   })
-      // new Promise(function(resolve, reject){
-          serialio.send(this.adapter, command, {baudRate:this.baudrate, timeoutRolling:10000}).then(response => {
+      return new Promise(function(resolve, reject){
+          serialio.send(this.adapter, command, {baudRate:this.baudrate}).then(response => {
           this.log.debug(`Response came back: ${response}`)
           // Error handling
           if (response.indexOf("Block") > -1) {
             this.log.warn("Block in response.")
+            reject();
           } 
           if (response === undefined) {
             this.log.error("Response was undefined.")
+            reject();
           }
           // Response handling
           if (response.indexOf("*pow=") > -1) {
             this.handlePowResponse(response);
+            resolve();
           }
           if (response.indexOf("*sour=") > -1) {
             this.handleSourResponse(response);
+            resolve();
           }
           if (response.indexOf("*mute=") > -1) {
             this.handleMuteResponse(response);
+            resolve();
           }
           if (response.indexOf("*vol=") > -1) {
             this.handleVolResponse(response);
+            resolve();
           }
         }).catch(error => {
           this.log.error(`Sending command encountered error: ${error}`)
+          reject();
         });
+      })
         
     }
 
@@ -230,51 +228,48 @@ class BenQProjector {
     }
 
     getPowerState(callback) {
+        this.log.debug('Getting power state.');
         if (callback) {
           callback(null, this.state);
         }
-        try {
-            this.log.debug('Getting power state.');
-            this.sendCommand(this.commands['Power State']);
-        }
-        catch (e) {
-            this.log.error(`Failed to get power state: ${e}`);
-        }
+        serialio.send(this.adapter, this.commands['Power State'], {baudRate:this.baudrate}).then(response => {
+          this.handlePowResponse(response);
+        }).catch(error => {
+          this.log.error(`Failed to get power state: ${error}`)
+        });
     }
         
     setPowerState(value, callback) {
         this.log.debug(`Set projector power state to ${value}`);
-        this.state = value;
         if (callback) {
           callback(null, this.state);
         }
-        try {
-          if (value) {
-            var cmd = this.commands['Power On'];
-            this.log.info("Power On");
-          } else {
-            var cmd = this.commands['Power Off'];
-            this.log.info("Power Off");
-          }
-    
-          this.sendCommand(cmd);
+        this.state = value;
+        if (value) {
+          var cmd = this.commands['Power On'];
+          this.log.info("Power On");
+        } else {
+          var cmd = this.commands['Power Off'];
+          this.log.info("Power Off");
         }
-        catch (e) {
-          this.log.error(`Failed to set power state ${e}`);
-        }
+        
+        serialio.send(this.adapter, cmd, {baudRate:this.baudrate}).then(response => {
+          this.handlePowResponse(response);
+        }).catch (e => {
+        this.log.error(`Failed to set power state ${e}`);
+      })
     }
         
     getMuteState(callback) {
-      if (callback) {
-        callback(null, this.mute);
-      }
-      try {
           this.log.debug('Getting mute state.');
-          this.sendCommand(this.commands['Mute State']);
-      }
-      catch (e) {
+          if (callback) {
+            callback(null, this.mute);
+          }
+          serialio.send(this.adapter, this.commands['Mute State'], {baudRate:this.baudrate}).then(response => {
+            this.handleMuteResponse(response);
+          }).catch (e => {
           this.log.error(`Failed to get mute state: ${e}`);
-      }
+      })
     }
         
     setMuteState(value, callback) {
@@ -283,7 +278,6 @@ class BenQProjector {
         if (callback) {
           callback(null, this.mute);
         }
-        try {
           if (value) {
             var cmd = this.commands['Mute On'];
             this.log.info("Mute On")
@@ -291,47 +285,47 @@ class BenQProjector {
             var cmd = this.commands['Mute Off'];
             this.log.info("Mute Off");
           }
-
-          this.sendCommand(cmd);
-        }
-        catch (e) {
+          serialio.send(this.adapter, cmd, {baudRate:this.baudrate}).then(response => {
+          this.handleMuteResponse(response);
+          }).catch (e => {
           this.log.error(`Failed to set mute state ${e}`);
-        }
+        })
     }
         
     getVolume(callback) {
-        if (callback) {
-          callback(null, this.volume);
-        }
-        try {
             this.log.debug('Getting volume state.')
-            this.sendCommand(this.commands['Volume State']);
-        }
-        catch (e) {
+            if (callback) {
+              callback(null, this.volume);
+            }
+            serialio.send(this.adapter, this.commands['Volume State'], {baudRate:this.baudrate}).then(response => {
+              this.handleVolResponse(response);
+            }).catch (e => {
             this.log.error(`Failed to get volume state: ${e}`);
-        }
+        })
     }
 
     setVolumeState(value, callback) {
-        if (callback) {
-          callback(null, this.volume);
-        }
-        this.getVolume();
-        var volDiff = this.volume - value;
-        this.log.info("Setting volume to %s", value);
-        if (volDiff < 0) {
-            while (volDiff < 0)
-            this.setVolumeRelative(Characteristic.VolumeSelector.INCREMENT)
-        } else if (volDiff > 0) {
-            while (volDiff > 0)
-            this.setVolumeRelative(Characteristic.VolumeSelector.DECREMENT)
-        }
+      if (callback) {
+        callback(null, this.volume);
+      }
+        this.getVolume().then(function(){
+          var volDiff = this.volume - value;
+          this.log.info("Setting volume to %s", value);
+          if (volDiff < 0) {
+              while (volDiff < 0)
+              this.setVolumeRelative(Characteristic.VolumeSelector.INCREMENT)
+          } else if (volDiff > 0) {
+              while (volDiff > 0)
+              this.setVolumeRelative(Characteristic.VolumeSelector.DECREMENT)
+          }
+        })
+        
     }
 
     setVolumeRelative(volumeDirection, callback) {
-        if (callback) {
-          callback();
-        }
+      if (callback) {
+        callback();
+      }
         // Change volume by pressing Volume Up or Volume Down
       if (volumeDirection === Characteristic.VolumeSelector.INCREMENT) {
         var cmd = this.commands['Volume Up'];
@@ -343,60 +337,57 @@ class BenQProjector {
         that.log.error( "setVolumeRelative - VOLUME : ERROR - unknown direction sent");
       }
       
-      this.sendCommand(cmd)
+      serialio.send(this.adapter, cmd, {baudRate:this.baudrate}).then(response => {
+        this.handleVolResponse(response);
+      }).catch(e => {
+        this.log.error(`Failed to set volume: ${e}`)
+      });
     }
 
     getInputSource(callback) {
-        if (callback) {
-          callback(null, this.lastKnownSource);
-        }
+      if (callback) {
+        callback(null, this.lastKnownSource);
+      }
         this.log.debug("Getting source")
-        try {
-          this.sendCommand(this.commands['Source Get']);
-        }
-        catch (e) {
+          serialio.send(this.adapter, this.commands['Source Get'], {baudRate:this.baudrate}).then(response => {
+            this.handleSourResponse(response);
+          }).catch (e => {
           this.log.error(`Failed to refresh Input state: ${this.commands['Source Get']} => ${e}`);
-        }
+        })
     }
 
     setInputSource(source, callback) {
         this.log.debug(`Set projector Input to ${source}`);
+        if (callback) {
+          callback();
+        }
         var cmd = this.commands['Source Set'];
         var input = this.inputs[source];
         this.log.info("Setting input to %s", input['label']);
         cmd = cmd + input['input'] + "#";
-        if (callback) {
-          callback();
-        }
-        try {
           this.log.debug(`Sending setInputSource ${cmd}`);
-          this.sendCommand(cmd);
-        }
-        catch (e) {
+          serialio.send(this.adapter, cmd, {baudRate:this.baudrate}).then(response => {
+            this.handleSourResponse(response);
+          }).catch (e => {
           this.log.error(`Failed to set characteristic ${e}`);
-        }
+        })
     }
         
     identify(callback) {
-        if(callback) callback();
         this.log.info("Identify requested!");
         
         this.setPowerState(true); // turn on
     }
 
     remoteKeyPress(button, callback) {
+      if(callback) callback();
       this.log.debug(button)
-      if (callback) {
-        callback();
-      }
       if (this.buttons[button]) {
         var press = this.buttons[button]
         this.log.info("Pressing remote key %s", button);
-        try {
-          this.sendCommand(press);
-        } catch (e) {
+          serialio.send(this.adapter, press, {baudRate:this.baudrate}).then().catch (e => {
           this.log.error(`Failed to press remote key: ${e}`);
-        }
+        })
       } else {
         this.log.error('Remote button %d not supported.', button)
         return
