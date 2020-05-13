@@ -1,8 +1,5 @@
 // Accessory for controlling BenQ Projectors via HomeKit.
-// Adapted from https://github.com/rooi/homebridge-marantz-rs232
-// and https://github.com/grover/homebridge-epson-projector-rs232
 
-// var SerialPort = require("serialport");
 var Service, Characteristic;
 const serialio = require('serial-io');
 var version = require('./package.json').version;
@@ -88,9 +85,29 @@ class BenQProjector {
     // Serial Command Function //
     /////////////////////////////
     sendCommand(command) {
-      this.log.debug("sendCommand: %s", command);
-      serialio.send(this.adapter, command, {baudrate:this.baudrate}).then(response =>
-        {
+      this.log.debug("sendCommand: " + command);
+      // return new Promise((resolve, reject) => {
+      //   serialport.list((err, ports) => {
+      //     if (err) {
+      //       reject(new Error(err))
+      //     } else {
+      //       resolve(ports)
+      //     }
+      //   })
+      // })
+      // let connection
+      // return new Connection(portName, opts)
+      //   .then(conn => {
+      //     connection = conn
+      //     return connection.send(content, opts)
+      //   })
+      //   .then(response => {
+      //     connection.close()
+      //     return response
+      //   })
+      // new Promise(function(resolve, reject){
+          serialio.send(this.adapter, command, {baudRate:this.baudrate, timeoutRolling:10000}).then(response => {
+          this.log.info(`Response came back: ${response}`)
           // Error handling
           if (response.indexOf("Block") > -1) {
             this.log.warn("Block in response.")
@@ -111,8 +128,8 @@ class BenQProjector {
           if (response.indexOf("*vol=") > -1) {
             this.handleVolResponse(response);
           }
-        }
-      );
+        });
+        
     }
 
     handlePowResponse(response) {
@@ -191,10 +208,9 @@ class BenQProjector {
         this.log.debug('Refresh projector status');
     
         try {
-            this.log.debug('Refreshing power state.');
+          this.log.debug('Refreshing power state.');
           this.getPowerState();
           this.log.debug('Power state refreshed.');
-
           if (this.state) {
             this.log.debug('Refreshing input source.');
             this.getInputSource();
@@ -239,7 +255,7 @@ class BenQProjector {
             this.log.info("Power Off");
           }
     
-          sendCommand(cmd);
+          this.sendCommand(cmd);
         }
         catch (e) {
           this.log.error(`Failed to set power state ${e}`);
@@ -252,7 +268,7 @@ class BenQProjector {
       }
       try {
           this.log.debug('Getting mute state.');
-          sendCommand(this.commands['Mute State']);
+          this.sendCommand(this.commands['Mute State']);
       }
       catch (e) {
           this.log.error(`Failed to get mute state: ${e}`);
@@ -274,8 +290,7 @@ class BenQProjector {
             this.log.info("Mute Off");
           }
 
-          sendCommand(cmd);
-          this.getMuteState();
+          this.sendCommand(cmd);
         }
         catch (e) {
           this.log.error(`Failed to set mute state ${e}`);
@@ -288,7 +303,7 @@ class BenQProjector {
         }
         try {
             this.log.debug('Getting volume state.')
-            sendCommand(this.commands['Volume State']);
+            this.sendCommand(this.commands['Volume State']);
         }
         catch (e) {
             this.log.error(`Failed to get volume state: ${e}`);
@@ -326,7 +341,7 @@ class BenQProjector {
         that.log.error( "setVolumeRelative - VOLUME : ERROR - unknown direction sent");
       }
       
-      sendCommand(cmd)
+      this.sendCommand(cmd)
     }
 
     getInputSource(callback) {
@@ -335,7 +350,7 @@ class BenQProjector {
         }
         this.log.debug("Getting source")
         try {
-          sendCommand(this.commands['Source Get']);
+          this.sendCommand(this.commands['Source Get']);
         }
         catch (e) {
           this.log.error(`Failed to refresh Input state: ${this.commands['Source Get']} => ${e}`);
@@ -353,7 +368,7 @@ class BenQProjector {
         }
         try {
           this.log.debug(`Sending setInputSource ${cmd}`);
-          sendCommand(cmd);
+          this.sendCommand(cmd);
         }
         catch (e) {
           this.log.error(`Failed to set characteristic ${e}`);
@@ -376,7 +391,7 @@ class BenQProjector {
         var press = this.buttons[button]
         this.log.info("Pressing remote key %s", button);
         try {
-          sendCommand(press);
+          this.sendCommand(press);
         } catch (e) {
           this.log.error(`Failed to press remote key: ${e}`);
         }
