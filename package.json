@@ -31,10 +31,10 @@
     "homekit"
   ],
   "engines": {
-    "node": "^12.16.0",
-    "homebridge": "^0.4.46"
+    "node": ">=12.16.0",
+    "homebridge": ">=0.4.46"
   },
   "dependencies": {
-    "serial-io": "^1.1.0"
+    "serial-io": "solowalker27/serial-io"
   }
 }
