@@ -74,6 +74,9 @@ class BenQProjector {
         
         // Start polling
         this.refreshProjectorStatus();
+        this.serial = serialio.connect(this.adapter, {baudRate:this.baudrate}).catch((error) =>
+          this.log("error", `Serial connection error: ${error}`)
+        )
     }
 
     log(level, line) {
@@ -97,7 +100,7 @@ class BenQProjector {
     sendCommand(command) {
       this.log("debug", `sendCommand: ${command}`);
       return new Promise(function(resolve, reject){
-          serialio.send(this.adapter, command, {baudRate:this.baudrate}).then(response => {
+          serial.send(command).then(response => {
           this.log("debug", `Response came back: ${response}`)
           // Error handling
           if (response.indexOf("Block") > -1) {
