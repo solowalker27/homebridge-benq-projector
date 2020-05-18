@@ -228,9 +228,7 @@ class BenQProjector {
 
     getPowerState(callback) {
         this.log("debug", 'Getting power state.');
-        this.sendCommand(this.commands['Power State']).catch(error => {
-            this.log("error", `Failed to get power state: ${error}`)
-        });
+        this.queue.push(this.commands['Power State']);
         if (callback) {
             callback(null, this.state);
         }
@@ -295,9 +293,7 @@ class BenQProjector {
 
     getVolume(callback) {
         this.log("debug", 'Getting volume state.')
-        this.sendCommand(this.commands['Volume State']).catch(e => {
-            this.log("error", `Failed to get volume state: ${e}`);
-        })
+        this.queue.push(this.commands['Volume State']);
         if (callback) {
             callback(null, this.volume);
         }
@@ -363,10 +359,8 @@ class BenQProjector {
 
     getInputSource(callback) {
         if (this.state) {
-            this.log("debug", "Getting source")
-            this.sendCommand(this.commands['Source Get']).catch(e => {
-                this.log("error", `Failed to refresh Input state: ${this.commands['Source Get']} => ${e}`);
-            })
+            this.log("debug", "Getting source");
+            this.queue.push(this.commands['Source Get']);
         }
         if (callback) {
             callback(null, this.lastKnownSource);
@@ -399,9 +393,7 @@ class BenQProjector {
         if (this.buttons[button]) {
             var press = this.buttons[button]
             this.log("info", "Pressing remote key %s", button);
-                this.sendCommand(press).catch(e => {
-                    this.log("error", `Failed to press remote key: ${e}`);
-                })
+                this.queue.push(press);
         } else {
             this.log("error", 'Remote button %d not supported.', button)
             return
