@@ -4,14 +4,14 @@ var Service, Characteristic;
 const serialio = require('serial-io');
 var version = require('./package.json').version;
 
-module.exports = function(homebridge) {
+module.exports = function (homebridge) {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
-    
+
     homebridge.registerAccessory("homebridge-benq-projector", "BenQ-Projector", BenQProjector);
 }
-    
-    
+
+
 class BenQProjector {
     // Configuration
     constructor(log, config) {
@@ -81,18 +81,18 @@ class BenQProjector {
     }
 
     log(level, line) {
-      if (level === "info") {
-        this._log.info(JSON.stringify(line));
-      }
-      if (level === "error") {
-        this._log.error(JSON.stringify(line));
-      }
-      if (level === "warn") {
-        this._log.warn(JSON.stringify(line));
-      }
-      if (level === "debug") {
-        this._log.debug(JSON.stringify(line));
-      }
+        if (level === "info") {
+            this._log.info(JSON.stringify(line));
+        }
+        if (level === "error") {
+            this._log.error(JSON.stringify(line));
+        }
+        if (level === "warn") {
+            this._log.warn(JSON.stringify(line));
+        }
+        if (level === "debug") {
+            this._log.debug(JSON.stringify(line));
+        }
     }
 
     /////////////////////////////
@@ -158,7 +158,7 @@ class BenQProjector {
             this.log("debug", 'Power is Off');
             this.state = false;
         }
-        
+
         this.tvService
             .getCharacteristic(Characteristic.Active)
             .updateValue(this.state);
@@ -166,10 +166,10 @@ class BenQProjector {
 
     handleSourResponse(response) {
         this.log("debug", `getInput response: ${response}`);
-        this.inputs.forEach((i, x) =>  {
-            if (response.toLowerCase().indexOf(i.input.toLowerCase() +"#") > -1) {
-            this.lastKnownSource = x;
-            this.log("debug", "Input is %s", i.input);
+        this.inputs.forEach((i, x) => {
+            if (response.toLowerCase().indexOf(i.input.toLowerCase() + "#") > -1) {
+                this.lastKnownSource = x;
+                this.log("debug", "Input is %s", i.input);
             }
         })
         this.log("debug", `Setting ActiveIdentifier to: ${this.lastKnownSource}`);
@@ -188,25 +188,25 @@ class BenQProjector {
             this.mute = false;
         }
         this.tvSpeakerService
-              .getCharacteristic(Characteristic.Mute)
-              .updateValue(this.mute);
+            .getCharacteristic(Characteristic.Mute)
+            .updateValue(this.mute);
     }
 
     handleVolResponse(response) {
-      if(response.indexOf("*VOL=") > -1) {
-        var vol = Number(response.split('=')[1].split('#'));
-        this.log("debug", `Volume is: ${vol}`)
-        if (vol) {
-            this.volume = vol;
+        if (response.indexOf("*VOL=") > -1) {
+            var vol = Number(response.split('=')[1].split('#'));
+            this.log("debug", `Volume is: ${vol}`)
+            if (vol) {
+                this.volume = vol;
+            }
+            if (vol) {
+                this.tvSpeakerService
+                    .getCharacteristic(Characteristic.Volume)
+                    .updateValue(this.volume);
+            }
         }
-        if (vol) {
-            this.tvSpeakerService
-                .getCharacteristic(Characteristic.Volume)
-                .updateValue(this.volume);
-        }
-      }
 
-      this.log("debug", "Volume is: %n", this.volume)
+        this.log("debug", "Volume is: %n", this.volume)
     }
 
 
@@ -216,25 +216,35 @@ class BenQProjector {
 
     refreshProjectorStatus() {
         this.log("debug", 'Refresh projector status');
-    
+
         try {
-          this.log("debug", 'Refreshing power state.');
-          this.getPowerState();
-          this.log("debug", 'Power state refreshed.');
-          if (this.state) {
-            this.log("debug", 'Refreshing input source.');
-            this.getInputSource();
-            this.log("debug", 'Input source refreshed.');
-          }
+            this.log("debug", 'Refreshing power state.');
+            this.getPowerState();
+            this.log("debug", 'Power state refreshed.');
+            if (this.state) {
+                this.log("debug", 'Refreshing input source.');
+                this.getInputSource();
+                this.log("debug", 'Input source refreshed.');
+            }
         }
         catch (e) {
-          this.log("error", `Failed to refresh projector status: ${e}`);
+            this.log("error", `Failed to refresh projector status: ${e}`);
         }
-    
+
         // Schedule another update
         setTimeout(() => {
-          this.refreshProjectorStatus();
+            this.refreshProjectorStatus();
         }, this.pollingInterval);
+    }
+
+    getPowerState(callback) {
+        this.log("debug", 'Getting power state.');
+        this.sendCommand(this.commands['Power State']).catch(error => {
+            this.log("error", `Failed to get power state: ${error}`)
+        });
+        if (callback) {
+            callback(null, this.state);
+        }
     }
 
     getPowerState(callback) {
@@ -294,49 +304,42 @@ class BenQProjector {
         }
     }
 
-    setVolumeState(value, callback) {
-        this.getVolume().then(function(){
-          var volDiff = this.volume - value;
-          this.log("info", "Setting volume to %s", value);
-          if (volDiff < 0) {
-              while (volDiff < 0)
-              this.setVolumeRelative(Characteristic.VolumeSelector.INCREMENT)
-          } else if (volDiff > 0) {
-              while (volDiff > 0)
-              this.setVolumeRelative(Characteristic.VolumeSelector.DECREMENT)
-          }
+    getVolume(callback) {
+        this.log("debug", 'Getting volume state.')
+        this.sendCommand(this.commands['Volume State']).catch(e => {
+            this.log("error", `Failed to get volume state: ${e}`);
         })
         if (callback) {
-          callback(null, this.volume);
+            callback(null, this.volume);
         }
     }
 
     setVolumeRelative(volumeDirection, callback) {
         // Change volume by pressing Volume Up or Volume Down
-      if (volumeDirection === Characteristic.VolumeSelector.INCREMENT) {
-        var cmd = this.commands['Volume Up'];
-        this.log("info", "Volume Up")
-      } else if (volumeDirection === Characteristic.VolumeSelector.DECREMENT) {
-        var cmd = this.commands['Volume Down'];
-        this.log("info", "Volume Down")
-      } else {
-        that.log.error( "setVolumeRelative - VOLUME : ERROR - unknown direction sent");
-      }
-      
-      this.queue.push(cmd);
-      if (callback) {
-        callback();
-      }
+        if (volumeDirection === Characteristic.VolumeSelector.INCREMENT) {
+            var cmd = this.commands['Volume Up'];
+            this.log("info", "Volume Up")
+        } else if (volumeDirection === Characteristic.VolumeSelector.DECREMENT) {
+            var cmd = this.commands['Volume Down'];
+            this.log("info", "Volume Down")
+        } else {
+            that.log.error( "setVolumeRelative - VOLUME : ERROR - unknown direction sent");
+        }
+        
+        this.queue.push(cmd);
+        if (callback) {
+            callback();
+        }
     }
 
     getInputSource(callback) {
-      if (this.state) {
-        this.log("debug", "Getting source")
-        this.queue.push(this.commands['Source Get']);
-      }
-      if (callback) {
-        callback(null, this.lastKnownSource);
-      }
+        if (this.state) {
+            this.log("debug", "Getting source")
+            this.queue.push(this.commands['Source Get']);
+        }
+        if (callback) {
+            callback(null, this.lastKnownSource);
+        }
     }
 
     setInputSource(source, callback) {
@@ -348,91 +351,118 @@ class BenQProjector {
         this.log("debug", `Sending setInputSource ${cmd}`);
         this.queue.push(cmd)
         if (callback) {
-          callback();
+            callback();
         }
     }
-        
+
+    getInputSource(callback) {
+        if (this.state) {
+            this.log("debug", "Getting source")
+            this.sendCommand(this.commands['Source Get']).catch(e => {
+                this.log("error", `Failed to refresh Input state: ${this.commands['Source Get']} => ${e}`);
+            })
+        }
+        if (callback) {
+            callback(null, this.lastKnownSource);
+        }
+    }
+
+    remoteKeyPress(button, callback) {
+        this.log("debug", button)
+        if (this.buttons[button]) {
+            var press = this.buttons[button]
+            this.log("info", "Pressing remote key %s", button);
+            this.queue.push(press);
+        } else {
+            this.log("error", 'Remote button %d not supported.', button)
+            return
+        }
+        if(callback) callback();
+    }
+
     identify(callback) {
         this.log("info", "Identify requested!");
         this.setPowerState(true);
         if (callback) {
-          callback();
+            callback();
         } // turn on
     }
 
     remoteKeyPress(button, callback) {
-      this.log("debug", button)
-      if (this.buttons[button]) {
-        var press = this.buttons[button]
-        this.log("info", "Pressing remote key %s", button);
-          this.queue.push(press);
-      } else {
-        this.log("error", 'Remote button %d not supported.', button)
-        return
-      }
-      if(callback) callback();
+        this.log("debug", button)
+        if (this.buttons[button]) {
+            var press = this.buttons[button]
+            this.log("info", "Pressing remote key %s", button);
+                this.sendCommand(press).catch(e => {
+                    this.log("error", `Failed to press remote key: ${e}`);
+                })
+        } else {
+            this.log("error", 'Remote button %d not supported.', button)
+            return
+        }
+        if (callback) callback();
     }
 
     addSources(service) {
-      this.log("debug", this.inputs)
-      this.inputs.forEach((i, x) =>  {
-          var inputName = i['label']
-          this.log("debug", inputName)
-          let tmpInput = new Service.InputSource(inputName, 'inputSource' + x);
-          tmpInput
-            .setCharacteristic(Characteristic.Identifier, x)
-            .setCharacteristic(Characteristic.ConfiguredName, inputName)
-            .setCharacteristic(Characteristic.IsConfigured, Characteristic.IsConfigured.CONFIGURED)
-            .setCharacteristic(Characteristic.InputSourceType, Characteristic.InputSourceType.HDMI)
-            .setCharacteristic(Characteristic.CurrentVisibilityState, Characteristic.CurrentVisibilityState.SHOWN);
-      
-          service.addLinkedService(tmpInput);
-          this.enabledServices.push(tmpInput);
-      })
+        this.log("debug", this.inputs)
+        this.inputs.forEach((i, x) => {
+            var inputName = i['label']
+            this.log("debug", inputName)
+            let tmpInput = new Service.InputSource(inputName, 'inputSource' + x);
+            tmpInput
+                .setCharacteristic(Characteristic.Identifier, x)
+                .setCharacteristic(Characteristic.ConfiguredName, inputName)
+                .setCharacteristic(Characteristic.IsConfigured, Characteristic.IsConfigured.CONFIGURED)
+                .setCharacteristic(Characteristic.InputSourceType, Characteristic.InputSourceType.HDMI)
+                .setCharacteristic(Characteristic.CurrentVisibilityState, Characteristic.CurrentVisibilityState.SHOWN);
+
+            service.addLinkedService(tmpInput);
+            this.enabledServices.push(tmpInput);
+        })
     }
-      
+
     prepareTvSpeakerService() {
-      this.tvSpeakerService = new Service.TelevisionSpeaker(this.name + ' Volume', 'tvSpeakerService');
-      this.tvSpeakerService
-          .setCharacteristic(Characteristic.Active, Characteristic.Active.ACTIVE)
-          .setCharacteristic(Characteristic.VolumeControlType, Characteristic.VolumeControlType.ABSOLUTE);
-      this.tvSpeakerService
-          .getCharacteristic(Characteristic.VolumeSelector)
-          .on('set', this.setVolumeRelative.bind(this));
-      this.tvSpeakerService
-          .getCharacteristic(Characteristic.Mute)
-          .on('get', this.getMuteState.bind(this))
-          .on('set', this.setMuteState.bind(this));
-      this.tvSpeakerService
-          .addCharacteristic(Characteristic.Volume)
-          .on('get', this.getVolume.bind(this))
-          .on('set', this.setVolumeState.bind(this));
-    
-      this.tvService.addLinkedService(this.tvSpeakerService);
-      this.enabledServices.push(this.tvSpeakerService);
+        this.tvSpeakerService = new Service.TelevisionSpeaker(this.name + ' Volume', 'tvSpeakerService');
+        this.tvSpeakerService
+            .setCharacteristic(Characteristic.Active, Characteristic.Active.ACTIVE)
+            .setCharacteristic(Characteristic.VolumeControlType, Characteristic.VolumeControlType.ABSOLUTE);
+        this.tvSpeakerService
+            .getCharacteristic(Characteristic.VolumeSelector)
+            .on('set', this.setVolumeRelative.bind(this));
+        this.tvSpeakerService
+            .getCharacteristic(Characteristic.Mute)
+            .on('get', this.getMuteState.bind(this))
+            .on('set', this.setMuteState.bind(this));
+        this.tvSpeakerService
+            .addCharacteristic(Characteristic.Volume)
+            .on('get', this.getVolume.bind(this))
+            .on('set', this.setVolumeState.bind(this));
+
+        this.tvService.addLinkedService(this.tvSpeakerService);
+        this.enabledServices.push(this.tvSpeakerService);
     }
-        
+
     getServices() {
         var informationService = new Service.AccessoryInformation();
         informationService
-        .setCharacteristic(Characteristic.Name, this.name)
-        .setCharacteristic(Characteristic.Manufacturer, "BenQ")
-        .setCharacteristic(Characteristic.Model, this.model)
-        .setCharacteristic(Characteristic.SerialNumber, this.adapter)
-        .setCharacteristic(Characteristic.FirmwareRevision, version);
+            .setCharacteristic(Characteristic.Name, this.name)
+            .setCharacteristic(Characteristic.Manufacturer, "BenQ")
+            .setCharacteristic(Characteristic.Model, this.model)
+            .setCharacteristic(Characteristic.SerialNumber, this.adapter)
+            .setCharacteristic(Characteristic.FirmwareRevision, version);
 
         this.enabledServices.push(informationService);
 
         this.tvService = new Service.Television(this.name);
 
         this.tvService.setCharacteristic(Characteristic.ConfiguredName, this.name)
-			  this.tvService.getCharacteristic(Characteristic.ConfiguredName).setProps({
-				  perms: [Characteristic.Perms.READ]
+        this.tvService.getCharacteristic(Characteristic.ConfiguredName).setProps({
+            perms: [Characteristic.Perms.READ]
         });
-      
+
         this.tvService
-          .setCharacteristic(Characteristic.SleepDiscoveryMode, Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE);
-      
+            .setCharacteristic(Characteristic.SleepDiscoveryMode, Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE);
+
         this.tvService
             .getCharacteristic(Characteristic.Active)
             .on('get', this.getPowerState.bind(this))
@@ -442,7 +472,7 @@ class BenQProjector {
             .getCharacteristic(Characteristic.ActiveIdentifier)
             .on('set', this.setInputSource.bind(this))
             .on('get', this.getInputSource.bind(this));
-      
+
         this.tvService
             .getCharacteristic(Characteristic.RemoteKey)
             .on('set', this.remoteKeyPress.bind(this));
@@ -452,7 +482,7 @@ class BenQProjector {
             .on('set', (newValue, callback) => {
                 this.remoteKeyPress(Characteristic.RemoteKey.INFORMATION, callback);
             });
-        
+
         this.enabledServices.push(this.tvService);
         this.prepareTvSpeakerService();
         this.addSources(this.tvService);
