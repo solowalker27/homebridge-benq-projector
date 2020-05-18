@@ -19,7 +19,6 @@ class BenQProjector {
         this.model = config['model'] || "-";
         this.adapter = config['adapter'];
         this.baudrate = config['baudrate'] || 115200;
-        // this.timeout = config.timeout || 1000;
         this.pollingInterval = config.pollingInterval || 6000;
         this.lastKnownSource = 0;
         this.state = false;
@@ -40,7 +39,8 @@ class BenQProjector {
             "Volume Up": "\r*vol=+#\r",
             "Volume Down": "\r*vol=-#\r",
             "Volume State": "\r*vol=?#\r",
-            "Source Set": "\r*sour=\r",
+            // This purposefully doesn't end in \r as it's added later when this command is used.
+            "Source Set": "\r*sour=",
             "Source Get": "\r*sour=?#\r"
         };
 
@@ -79,8 +79,8 @@ class BenQProjector {
         setInterval(() => {
             this.refreshProjectorStatus();
         }, this.pollingInterval);
-        setInterval(() => {
-            this.sendCommands();
+        setInterval(async() => {
+            await this.sendCommands();
         }, 500);
     }
 
@@ -102,45 +102,43 @@ class BenQProjector {
     /////////////////////////////
     // Serial Command Function //
     /////////////////////////////
-    sendCommands() {
+    async sendCommands() {
         // If the queue gets too big, reduce it by deduplicating it.
         if (this.queue.length > 5) {
             this.queue = [...new Set(this.queue)]
         }
-        this.queue.forEach((cmd, index) => {
+        
+        this.queue.forEach(async (cmd, index) => {
             this.log("debug", `sendCommand: ${cmd}`);
-            // let promise = new Promise((resolve, reject)=> {
-                serialio.send(this.adapter, cmd, {baudRate:this.baudrate}).then(response => {
-                    this.log("debug", `Response came back: ${response}`)
-                    // Error handling
-                    if (response.indexOf("Block") > -1) {
-                        // this.log("warn", "Block in response.")
-                        throw "Block in response."
-                    } 
-                    if (response === undefined) {
-                        // this.log("error", "Response was undefined.")
-                        throw "Response was undefined."
-                    }
-                    // Response handling
-                    if (response.indexOf("*pow=") > -1) {
-                        this.handlePowResponse(response);
-                    }
-                    if (response.indexOf("*sour=") > -1) {
-                        this.handleSourResponse(response);
-                    }
-                    if (response.indexOf("*mute=") > -1) {
-                        this.handleMuteResponse(response);
-                    }
-                    if (response.indexOf("*vol=") > -1) {
-                        this.handleVolResponse(response);
-                    }
-                    // Remove command that was successfully run.
-                    this.queue.splice(index, 1);
-                }).catch(error => {
+            var response = await serialio.send(this.adapter, cmd, {baudRate:this.baudrate}).catch(error => {
                     // Don't remove command that failed so it can be run again.
                     this.log("error", `Sending command ${cmd} encountered error: ${error}`)
                 });
-            })
+            if (response != null) {
+                this.log("debug", `Response came back: ${response} for command: ${cmd}`)
+                // Error handling
+                if (response.indexOf("Block") > -1) {
+                    this.log("warn", "Block in response.")
+                } 
+                // Response handling
+                if (response.indexOf("*pow=") > -1) {
+                    this.handlePowResponse(response);
+                }
+                if (response.indexOf("*sour=") > -1) {
+                    this.handleSourResponse(response);
+                }
+                if (response.indexOf("*mute=") > -1) {
+                    this.handleMuteResponse(response);
+                }
+                if (response.indexOf("*vol=") > -1) {
+                    this.handleVolResponse(response);
+                }
+                // Remove command that was successfully run.
+                this.queue.splice(index, 1);
+            } else {
+                this.log("error", "Response was undefined")
+            }
+        })
     }
 
     handlePowResponse(response) {
@@ -163,7 +161,7 @@ class BenQProjector {
         this.inputs.forEach((i, x) => {
             if (response.toLowerCase().indexOf(i.input.toLowerCase() + "#") > -1) {
                 this.lastKnownSource = x;
-                this.log("debug", "Input is %s", i.input);
+                this.log("debug", `Input is ${i.input}`);
             }
         })
         this.log("debug", `Setting ActiveIdentifier to: ${this.lastKnownSource}`);
@@ -200,7 +198,7 @@ class BenQProjector {
             }
         }
 
-        this.log("debug", "Volume is: %n", this.volume)
+        this.log("debug", `Volume is: ${this.volume}`)
     }
 
 
@@ -302,7 +300,7 @@ class BenQProjector {
     setVolumeState(value, callback) {
         this.getVolume().then(function () {
             var volDiff = this.volume - value;
-            this.log("info", "Setting volume to %s", value);
+            this.log("info", `Setting volume to ${value}`);
             if (volDiff < 0) {
                 while (volDiff < 0)
                 this.setVolumeRelative(Characteristic.VolumeSelector.INCREMENT)
@@ -348,8 +346,8 @@ class BenQProjector {
         this.log("debug", `Set projector Input to ${source}`);
         var cmd = this.commands['Source Set'];
         var input = this.inputs[source];
-        this.log("info", "Setting input to %s", input['label']);
-        cmd = cmd + input['input'] + "#";
+        this.log("info", `Setting input to ${input['label']}`);
+        cmd = cmd + input['input'] + "#\r";
         this.log("debug", `Sending setInputSource ${cmd}`);
         this.queue.push(cmd)
         if (callback) {
@@ -371,10 +369,10 @@ class BenQProjector {
         this.log("debug", button)
         if (this.buttons[button]) {
             var press = this.buttons[button]
-            this.log("info", "Pressing remote key %s", button);
+            this.log("info", `Pressing remote key ${button}`);
             this.queue.push(press);
         } else {
-            this.log("error", 'Remote button %d not supported.', button)
+            this.log("error", `Remote button ${button} not supported.`)
             return
         }
         if(callback) callback();
@@ -392,10 +390,10 @@ class BenQProjector {
         this.log("debug", button)
         if (this.buttons[button]) {
             var press = this.buttons[button]
-            this.log("info", "Pressing remote key %s", button);
+            this.log("info", `Pressing remote key ${button}`);
                 this.queue.push(press);
         } else {
-            this.log("error", 'Remote button %d not supported.', button)
+            this.log("error", `Remote button ${button} not supported.`)
             return
         }
         if (callback) callback();
