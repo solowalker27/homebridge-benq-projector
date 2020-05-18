@@ -136,21 +136,11 @@ class BenQProjector {
                     }
                     // Remove command that was successfully run.
                     this.queue.splice(index, 1);
-                    // resolve(response)
                 }).catch(error => {
                     // Don't remove command that failed so it can be run again.
-                    // reject(error);
                     this.log("error", `Sending command ${cmd} encountered error: ${error}`)
                 });
             })
-            // let response = await promise
-            // .then(response => {
-        // }).catch(error => {
-        //   this.log("error", `Sending command ${command} encountered error: ${error}`)
-        // });
-        // setTimeout(() => {
-        //     this.refreshProjectorStatus();
-        // }, this.pollingInterval);
     }
 
     handlePowResponse(response) {
@@ -234,11 +224,6 @@ class BenQProjector {
         catch (e) {
             this.log("error", `Failed to refresh projector status: ${e}`);
         }
-
-        // Schedule another update
-        // setTimeout(() => {
-        //     this.refreshProjectorStatus();
-        // }, this.pollingInterval);
     }
 
     getPowerState(callback) {
