@@ -76,8 +76,12 @@ class BenQProjector {
         this.queue = [];
 
         // Start polling
-        this.refreshProjectorStatus();
-        this.sendCommands();
+        setInterval(() => {
+            this.refreshProjectorStatus();
+        }, this.pollingInterval);
+        setInterval(() => {
+            this.sendCommands();
+        }, 500);
     }
 
     log(level, line) {
@@ -144,9 +148,9 @@ class BenQProjector {
         // }).catch(error => {
         //   this.log("error", `Sending command ${command} encountered error: ${error}`)
         // });
-        setTimeout(() => {
-            this.refreshProjectorStatus();
-        }, this.pollingInterval);
+        // setTimeout(() => {
+        //     this.refreshProjectorStatus();
+        // }, this.pollingInterval);
     }
 
     handlePowResponse(response) {
@@ -232,9 +236,9 @@ class BenQProjector {
         }
 
         // Schedule another update
-        setTimeout(() => {
-            this.refreshProjectorStatus();
-        }, this.pollingInterval);
+        // setTimeout(() => {
+        //     this.refreshProjectorStatus();
+        // }, this.pollingInterval);
     }
 
     getPowerState(callback) {
@@ -308,6 +312,23 @@ class BenQProjector {
         this.log("debug", 'Getting volume state.')
         this.sendCommand(this.commands['Volume State']).catch(e => {
             this.log("error", `Failed to get volume state: ${e}`);
+        })
+        if (callback) {
+            callback(null, this.volume);
+        }
+    }
+
+    setVolumeState(value, callback) {
+        this.getVolume().then(function () {
+            var volDiff = this.volume - value;
+            this.log("info", "Setting volume to %s", value);
+            if (volDiff < 0) {
+                while (volDiff < 0)
+                this.setVolumeRelative(Characteristic.VolumeSelector.INCREMENT)
+            } else if (volDiff > 0) {
+                while (volDiff > 0)
+                this.setVolumeRelative(Characteristic.VolumeSelector.DECREMENT)
+            }
         })
         if (callback) {
             callback(null, this.volume);
