@@ -112,13 +112,13 @@ class BenQProjector {
             this.log("debug", `sendCommand: ${cmd}`);
             var response = await serialio.send(this.adapter, cmd, {baudRate:this.baudrate}).catch(error => {
                     // Don't remove command that failed so it can be run again.
-                    this.log("error", `Sending command ${cmd} encountered error: ${error}`)
+                    this.log("debug", `Sending command ${cmd} encountered error: ${error}`)
                 });
             if (response != null) {
                 this.log("debug", `Response came back: ${response} for command: ${cmd}`)
                 // Error handling
                 if (response.indexOf("Block") > -1) {
-                    this.log("warn", "Block in response.")
+                    this.log("debug", "Block in response.")
                 } 
                 // Response handling
                 if (response.indexOf("*pow=") > -1) {
@@ -136,8 +136,10 @@ class BenQProjector {
                 // Remove command that was successfully run.
                 this.queue.splice(index, 1);
             } else {
-                this.log("error", "Response was undefined")
+                this.log("debug", "Response was undefined")
             }
+            // Try to give serial connection time to reset.
+            setTimeout(()=>1000)
         })
     }
 
