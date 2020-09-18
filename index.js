@@ -58,8 +58,6 @@ class BenQProjector {
 
         this.enabledServices = [];
 
-        this.category = Categories.TELEVISION;
-
         this.commands = {
             "Power On": "\r*pow=on#\r",
             "Power Off": "\r*pow=off#\r",
