@@ -1,12 +1,13 @@
 // Accessory for controlling BenQ Projectors via HomeKit.
 
-var Service, Characteristic;
+var Service, Characteristic, Categories;
 const serialio = require('serial-io');
 var version = require('./package.json').version;
 
 module.exports = function (homebridge) {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
+    Categories = homebridge.hap.Categories;
 
     homebridge.registerAccessory("homebridge-benq-projector", "BenQ-Projector", BenQProjector);
 }
@@ -28,6 +29,8 @@ class BenQProjector {
         this._log = log;
 
         this.enabledServices = [];
+
+        this.category = Categories.TELEVISION;
 
         this.commands = {
             "Power On": "\r*pow=on#\r",
