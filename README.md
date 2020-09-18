@@ -1,4 +1,4 @@
-# homebridge-benq-projector v1.1.1
+# homebridge-benq-projector v2.0.0
 Homebridge plugin for BenQ projectors via serial RS232 as HomeKit TVs. Requires iOS >=12.2 and homebridge >=0.4.46.
 
 ## Description
@@ -14,39 +14,52 @@ npm install -g homebridge-benq-projector
 ```
 4. Update your config.json, following the example below
 
-## Example accessory
+## Example configuration
 
- ```
+ ```json
 {
- "bridge": {
-   ...
-},
- "accessories": [{
-      "accessory": "BenQ-Projector",
-      "name": "Projector",
-      "model": "W1070",
-      "adapter": "/dev/ttyUSB0",
-      "inputs": [
-        {"input": "hdmi", "label": "Apple TV"},
-        {"input": "RGB", "label": "Computer"},
-        {"input": "ypbr", "label": "Component"},
-        {"input": "hdmi2", "label": "Raspberry Pi"},
-        {"input": "vid", "label": "Composite"},
-        {"input": "svid", "label": "S-Video"}
-      ] 
-}],
- "platforms": [
-    ...
- ]
+    "bridge": {
+      ...
+    },
+    "accessories": [
+      ...
+    ],
+    "platforms": [{
+        "platform": "BenQ-Projector",
+        "devices": [
+            {
+                "name": "BenQ w1070",
+                "model": "W1070",
+                "adapter": "/dev/ttyUSB0",
+                "inputs": [
+                    { "input": "hdmi", "label": "Apple TV" },
+                    { "input": "RGB", "label": "Computer" },
+                    { "input": "ypbr", "label": "Component" },
+                    { "input": "hdmi2", "label": "Raspberry Pi" },
+                    { "input": "vid", "label": "Composite" },
+                    { "input": "svid", "label": "S-Video" }
+                ],
+                "baudrate": 9600
+            }
+        ]
+      }]
 }
 
  ```
 
- ## Configuration
+## Configuration
+
+### General configuration
 
 | **Attributes** | **Required** | **Usage** |
 |------------|----------|-------|
-| accessory | **Yes** | Name of homebridge accessory plugin. Must be **BenQ-Projector**.   |
+| platform | **Yes** | Name of homebridge accessory plugin. Must be **BenQ-Projector**.   |
+| devices | **Yes** | Array of BenQ projectors. Each of them must be added manually to the Home app!   |
+
+### Device configuration
+
+| **Attributes** | **Required** | **Usage** |
+|------------|----------|-------|
 | name | **Yes** | Name of the projector, how you want it to appear in HomeKit. |
 | adapter | **Yes** | Path to serial RS232 adapter. |
 | model | No | Projector model. Only displayed in accessory details in HomeKit. |
@@ -55,6 +68,7 @@ npm install -g homebridge-benq-projector
 | baudrate | No | baudrate for your device. Default is 115200.
 
 ## List of known possible inputs
+
 | **Input** | **Default Label/Interface** |
 |-----------|-----------------------------|
 | `hdmi` | HDMI 1 |
@@ -70,13 +84,62 @@ npm install -g homebridge-benq-projector
 | `usbdisplay` | USB Display |
 | `usbreader` | USB Reader |
 
+## Convert to v2.0.0
+If you want to update to v2.0.0 or higher you'll need to adjust your configuration. The reason for that is the conversion from an accessory plugin to a platform plugin.
+
+Example config before v2.0.0:
+
+```json
+{
+    "accessory": "BenQ-Projector",
+    "name": "BenQ w1070",
+    "model": "W1070",
+    "adapter": "/dev/ttyUSB0",
+    "inputs": [
+        { "input": "hdmi", "label": "Apple TV" },
+        { "input": "RGB", "label": "Computer" },
+        { "input": "ypbr", "label": "Component" },
+        { "input": "hdmi2", "label": "Raspberry Pi" },
+        { "input": "vid", "label": "Composite" },
+        { "input": "svid", "label": "S-Video" }
+    ],
+    "baudrate": 9600
+}
+```
+
+The same config, that works with the v2.0.0:
+
+```json
+{
+    "platform": "BenQ-Projector",
+    "devices": [
+        {
+            "name": "BenQ w1070",
+            "model": "W1070",
+            "adapter": "/dev/ttyUSB0",
+            "inputs": [
+                { "input": "hdmi", "label": "Apple TV" },
+                { "input": "RGB", "label": "Computer" },
+                { "input": "ypbr", "label": "Component" },
+                { "input": "hdmi2", "label": "Raspberry Pi" },
+                { "input": "vid", "label": "Composite" },
+                { "input": "svid", "label": "S-Video" }
+            ],
+            "baudrate": 9600
+        }
+    ]
+}
+```
+
+In addition to the config changes, you'll need to move the plugin config from the `"accessories": [...]` to `"platforms": [...]` section of your HomeBridge instance.
+
 
 ## Known issues 
 - As of v1.1.0 there are no known issues.
 
 ## Changelog
-v1.1.1
-- Fixed a bug related to iOS 14 changes.
+v2.0.0 **BREAKING CHANGE**
+- Converted plugin to a HomeBridge Platform due to HomeKit limitations. In order to use multiple TVs in HomeKit, they need to be exposed as spearate external accessories. This feature is only available to platform plugins.
 
 v1.1.0
 - Switch from the borrowed Transport.js to serial-io package for serial communication. Should increase long term speed and stability.

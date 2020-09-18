@@ -1,17 +1,44 @@
 // Accessory for controlling BenQ Projectors via HomeKit.
 
-var Service, Characteristic, Categories;
 const serialio = require('serial-io');
-var version = require('./package.json').version;
+const version = require('./package.json').version;
+const Service, Characteristic, Categories;
 
 module.exports = function (homebridge) {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
     Categories = homebridge.hap.Categories;
 
-    homebridge.registerAccessory("homebridge-benq-projector", "BenQ-Projector", BenQProjector);
+    homebridge.registerPlatform("homebridge-benq-projector", "BenQ-Projector", BenQProjectorPlatform);
 }
 
+class BenQProjectorPlatform {
+    constructor (log, config = {}, homebridge) {
+        this.log = log;
+        this.config = config;
+        this.homebridge = homebridge;
+    }
+
+    accessories (callback) {
+        const { config, log, homebridge } = this;
+        if (!config) {
+            log.warn('No config found. Please take a look at the README and example-config.json file of homebridge-benq-projector!');
+            callback([]);
+            return;
+        }
+
+        if (!config.devices || !(config.devices instanceof Array)) {
+            log.warn('Malformed configuration found. Please take a look at the README and example-config.json file of homebridge-benq-projector!');
+            callback([]);
+            return;
+        }
+
+        const tvs = config.devices.map(device => new BenQProjector(log, device));
+        homebridge.publishExternalAccessories(this, tvs.map(tv => createAccessory(tv, tv.name, Categories.TELEVISION, homebridge)));
+
+        callback([]);
+    }
+}
 
 class BenQProjector {
     // Configuration
