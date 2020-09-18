@@ -13,6 +13,7 @@
         {"input": "hdmi2", "label": "Raspberry Pi"},
         {"input": "vid", "label": "Composite"},
         {"input": "svid", "label": "S-Video"}
-      ] 
+      ],
+      "baudrate": 9600
     }]
 }
