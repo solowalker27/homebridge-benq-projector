@@ -2,7 +2,7 @@
 
 const serialio = require('serial-io');
 const version = require('./package.json').version;
-const Service, Characteristic, Categories;
+let Service, Characteristic, Categories;
 
 module.exports = function (homebridge) {
     Service = homebridge.hap.Service;
