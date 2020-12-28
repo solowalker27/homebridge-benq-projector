@@ -1,20 +1,19 @@
-// Accessory for controlling BenQ Projectors via HomeKit.
+// Platform for controlling BenQ Projectors via HomeKit.
 
-var Service, Characteristic;
 const serialio = require('serial-io');
 var version = require('./package.json').version;
 
-module.exports = function (homebridge) {
-    Service = homebridge.hap.Service;
-    Characteristic = homebridge.hap.Characteristic;
+const PLUGIN_NAME = 'homebridge-benq-projector';
+const PLATFORM_NAME = 'BenQ-Projector';
 
-    homebridge.registerAccessory("homebridge-benq-projector", "BenQ-Projector", BenQProjector);
+module.exports = (api) => {
+  api.registerPlatform(PLATFORM_NAME, BenQProjector);
 }
 
 
 class BenQProjector {
     // Configuration
-    constructor(log, config) {
+    constructor(log, config, api) {
         this.name = config['name'];
         this.model = config['model'] || "-";
         this.adapter = config['adapter'];
@@ -26,8 +25,14 @@ class BenQProjector {
         this.volume = 0;
         
         this._log = log;
-
-        this.enabledServices = [];
+        this.api = api;
+        const uuid = this.api.hap.uuid.generate('homebridge:homebridge-benq-projector' + this.name);
+        this.tvAccessory = new api.platformAccessory(this.name, uuid);
+        this.tvAccessory.category = this.api.hap.Categories.TELEVISION;
+        const tvService = this.tvAccessory.addService(this.Service.Television);
+        this.setUpTVService(tvService);
+        this.addSources(this.tvAccessory, tvService);
+        this.setUpTVSpeakerService(this.tvAccessory);
 
         this.commands = {
             "Power On": "\r*pow=on#\r",
@@ -82,6 +87,8 @@ class BenQProjector {
         setInterval(async() => {
             await this.sendCommands();
         }, 500);
+
+        this.api.publishExternalAccessories(PLUGIN_NAME, [this.tvAccessory]);
     }
 
     log(level, line) {
@@ -401,89 +408,67 @@ class BenQProjector {
         if (callback) callback();
     }
 
-    addSources(service) {
+    addSources(accessory, service) {
         this.log("debug", this.inputs)
         this.inputs.forEach((i, x) => {
             var inputName = i['label']
             this.log("debug", inputName)
-            let tmpInput = new Service.InputSource(inputName, 'inputSource' + x);
-            tmpInput
-                .setCharacteristic(Characteristic.Identifier, x)
-                .setCharacteristic(Characteristic.ConfiguredName, inputName)
-                .setCharacteristic(Characteristic.IsConfigured, Characteristic.IsConfigured.CONFIGURED)
-                .setCharacteristic(Characteristic.InputSourceType, Characteristic.InputSourceType.HDMI)
-                .setCharacteristic(Characteristic.CurrentVisibilityState, Characteristic.CurrentVisibilityState.SHOWN);
-
-            service.addLinkedService(tmpInput);
-            this.enabledServices.push(tmpInput);
+            let newInput = accessory.addService(this.Service.InputSource, inputName, 'inputSource' + x);
+            newInput
+                .setCharacteristic(this.Characteristic.Identifier, x)
+                .setCharacteristic(this.Characteristic.ConfiguredName, inputName)
+                .setCharacteristic(this.Characteristic.IsConfigured, this.Characteristic.IsConfigured.CONFIGURED)
+                .setCharacteristic(this.Characteristic.InputSourceType, this.Characteristic.InputSourceType.HDMI);
+            service.addLinkedService(newInput);
         })
     }
 
-    prepareTvSpeakerService() {
-        this.tvSpeakerService = new Service.TelevisionSpeaker(this.name + ' Volume', 'tvSpeakerService');
-        this.tvSpeakerService
-            .setCharacteristic(Characteristic.Active, Characteristic.Active.ACTIVE)
-            .setCharacteristic(Characteristic.VolumeControlType, Characteristic.VolumeControlType.ABSOLUTE);
-        this.tvSpeakerService
-            .getCharacteristic(Characteristic.VolumeSelector)
+    setUpTVSpeakerService(accessory) {
+        let tvSpeakerService = accessory.addService(this.Service.TelevisionSpeaker);
+
+        tvSpeakerService
+            .setCharacteristic(this.Characteristic.Active, this.Characteristic.Active.ACTIVE)
+            .setCharacteristic(this.Characteristic.VolumeControlType, this.Characteristic.VolumeControlType.ABSOLUTE);
+        tvSpeakerService
+            .getCharacteristic(this.Characteristic.VolumeSelector)
             .on('set', this.setVolumeRelative.bind(this));
-        this.tvSpeakerService
-            .getCharacteristic(Characteristic.Mute)
+        tvSpeakerService
+            .getCharacteristic(this.Characteristic.Mute)
             .on('get', this.getMuteState.bind(this))
             .on('set', this.setMuteState.bind(this));
-        this.tvSpeakerService
-            .addCharacteristic(Characteristic.Volume)
+        tvSpeakerService
+            .addCharacteristic(this.Characteristic.Volume)
             .on('get', this.getVolume.bind(this))
             .on('set', this.setVolumeState.bind(this));
-
-        this.tvService.addLinkedService(this.tvSpeakerService);
-        this.enabledServices.push(this.tvSpeakerService);
     }
 
-    getServices() {
-        var informationService = new Service.AccessoryInformation();
-        informationService
-            .setCharacteristic(Characteristic.Name, this.name)
-            .setCharacteristic(Characteristic.Manufacturer, "BenQ")
-            .setCharacteristic(Characteristic.Model, this.model)
-            .setCharacteristic(Characteristic.SerialNumber, this.adapter)
-            .setCharacteristic(Characteristic.FirmwareRevision, version);
+    setUpTVService(service) {
+        service
+            .setCharacteristic(this.Characteristic.ConfiguredName, this.name)
+            .setCharacteristic(this.Characteristic.Manufacturer, "BenQ")
+            .setCharacteristic(this.Characteristic.Model, this.model)
+            .setCharacteristic(this.Characteristic.SerialNumber, this.adapter)
+            .setCharacteristic(this.Characteristic.FirmwareRevision, version)
+            .setCharacteristic(this.Characteristic.SleepDiscoveryMode, this.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE);
 
-        this.enabledServices.push(informationService);
-
-        this.tvService = new Service.Television(this.name);
-
-        this.tvService.setCharacteristic(Characteristic.ConfiguredName, this.name)
-        this.tvService.getCharacteristic(Characteristic.ConfiguredName).setProps({
-            perms: [Characteristic.Perms.READ]
-        });
-
-        this.tvService
-            .setCharacteristic(Characteristic.SleepDiscoveryMode, Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE);
-
-        this.tvService
-            .getCharacteristic(Characteristic.Active)
+        service
+            .getCharacteristic(this.Characteristic.Active)
             .on('get', this.getPowerState.bind(this))
             .on('set', this.setPowerState.bind(this));
 
-        this.tvService
-            .getCharacteristic(Characteristic.ActiveIdentifier)
+        service
+            .getCharacteristic(this.Characteristic.ActiveIdentifier)
             .on('set', this.setInputSource.bind(this))
             .on('get', this.getInputSource.bind(this));
 
-        this.tvService
-            .getCharacteristic(Characteristic.RemoteKey)
+        service
+            .getCharacteristic(this.Characteristic.RemoteKey)
             .on('set', this.remoteKeyPress.bind(this));
 
-        this.tvService
-            .getCharacteristic(Characteristic.PowerModeSelection)
+        service
+            .getCharacteristic(this.Characteristic.PowerModeSelection)
             .on('set', (newValue, callback) => {
                 this.remoteKeyPress(Characteristic.RemoteKey.INFORMATION, callback);
             });
-
-        this.enabledServices.push(this.tvService);
-        this.prepareTvSpeakerService();
-        this.addSources(this.tvService);
-        return this.enabledServices;
     }
 };
