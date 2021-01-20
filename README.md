@@ -1,8 +1,8 @@
-# homebridge-benq-projector v1.1.0
+# homebridge-benq-projector v2.0.0
 Homebridge plugin for BenQ projectors via serial RS232 as HomeKit TVs. Requires iOS >=12.2 and homebridge >=0.4.46.
 
 ## Description
-This plugin connects to a BenQ projector via serial RS232. Developed and tested using a Raspberry Pi and a USB to serial RS232 cable to connect to a BenQ W1070.
+This plugin connects to BenQ projectors via serial RS232. Developed and tested using a Raspberry Pi and a USB to serial RS232 cable to connect to a BenQ W1070.
 
 ## Installation instructions
 
@@ -36,7 +36,23 @@ npm install -g homebridge-benq-projector
       ] 
 }],
  "platforms": [
-    ...
+    {
+      "platform": "BenQ-Projector",
+      "accessories": [
+        {
+          "name": "Projector",
+          "model": "W1070",
+          "adapter": "/dev/ttyUSB0",
+          "inputs": [
+            {"input": "hdmi", "label": "Apple TV"},
+            {"input": "RGB", "label": "Computer"},
+            {"input": "ypbr", "label": "Component"},
+            {"input": "hdmi2", "label": "Raspberry Pi"},
+            {"input": "vid", "label": "Composite"},
+            {"input": "svid", "label": "S-Video"}
+        }
+      ]
+    }
  ]
 }
 
@@ -44,9 +60,12 @@ npm install -g homebridge-benq-projector
 
  ## Configuration
 
-| **Attributes** | **Required** | **Usage** |
+| **Platform Attributes** | **Required** | **Usage** |
 |------------|----------|-------|
-| accessory | **Yes** | Name of homebridge accessory plugin. Must be **BenQ-Projector**.   |
+| platform | **Yes** | Name of homebridge platform plugin. Must be **BenQ-Projector**.   |
+| accessories | **Yes** | Array of individual accessories you want to connect to. |
+|------------|----------|-------|
+| **Accessory Attribute** | **Required** | **Usage** |
 | name | **Yes** | Name of the projector, how you want it to appear in HomeKit. |
 | adapter | **Yes** | Path to serial RS232 adapter. |
 | model | No | Projector model. Only displayed in accessory details in HomeKit. |
@@ -72,9 +91,13 @@ npm install -g homebridge-benq-projector
 
 
 ## Known issues 
-- As of v1.1.0 there are no known issues.
+- As of v2.0.0 there are no known issues.
 
 ## Changelog
+v2.0.0
+- Refactor to a modern homebridge platform.
+- Fix generic home icon and accessory type to be TV on iOS 14+.
+
 v1.1.0
 - Switch from the borrowed Transport.js to serial-io package for serial communication. Should increase long term speed and stability.
 

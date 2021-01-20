@@ -26,6 +26,7 @@ class BenQProjector {
         
         this._log = log;
         this.api = api;
+        this.Service = api.hap.Service;
         const uuid = this.api.hap.uuid.generate('homebridge:homebridge-benq-projector' + this.name);
         this.tvAccessory = new api.platformAccessory(this.name, uuid);
         this.tvAccessory.category = this.api.hap.Categories.TELEVISION;
