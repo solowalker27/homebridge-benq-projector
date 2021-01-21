@@ -35,7 +35,7 @@ class BenQProjectorPlatform {
         }
 
         const tvs = config.devices.map(device => new BenQProjector(log, device));
-        homebridge.publishExternalAccessories(this, tvs.map(tv => createAccessory(tv, tv.name, Categories.TELEVISION, homebridge)));
+        homebridge.publishExternalAccessories('homebridge-benq-projector', tvs.map(tv => createAccessory(tv, tv.name, Categories.TELEVISION, homebridge)));
 
         callback([]);
     }
