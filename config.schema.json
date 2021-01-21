@@ -1,99 +1,114 @@
 {
     "pluginAlias": "BenQ-Projector",
-    "pluginType": "accessory",
+    "pluginType": "platform",
     "singular": false,
     "headerDisplay": "Control a BenQ projector or other display via RS232 serial.",
     "footerDisplay": "https://github.com/solowalker27/homebridge-benq-projector",
     "schema": {
         "type": "object",
         "required": [
-            "name",
-            "adapter"
+            "devices"
         ],
         "properties": {
-            "name": {
-                "type": "string",
-                "title": "Device Name",
-                "default": "Projector",
-                "description": "Name of the projector as it will appear in HomeKit."
-            },
-            "model": {
-                "type": "string",
-                "title": "Device Model",
-                "default": "W1070",
-                "description": "Only displayed in accessory details in HomeKit."
-            },
-            "adapter": {
-                "type": "string",
-                "title": "Path to Serial Adapter",
-                "default": "/dev/ttyUSB0",
-                "description": "File system path to the RS232 serial adapter used to communicate with projector."
-            },
-            "inputs": {
+            "devices": {
                 "type": "array",
-                "title": "Input Mapping",
-                "description": "List of inputs on the projector to expose in HomeKit and what they should be called.",
+                "title": "BenQ devices",
+                "description": "List of devices that should be exposed to HomeKit. Each of them must be added manually to the Home app!",
                 "items": {
                     "type": "object",
-                    "title": "Inputs",
-                    "description": "'Input' and 'label' pair where 'input' is the input according to the projector and 'label' is how it will be listed in HomeKit.",
+                    "title": "Devices",
+                    "description": "A device configuration represents one projector that will be exposed to HomeKit.",
                     "required": [
-                        "input",
-                        "label"
+                        "name",
+                        "adapter"
                     ],
                     "properties": {
-                        "input": {
+                        "name": {
                             "type": "string",
-                            "title": "Projector Input",
-                            "description": "Input according to the projector.",
-                            "oneOf": [
-                                {"enum": ["hdmi", "RGB", "ypbr", "hdmi2", "vid", "svid", "RGB2", "dviA", "dvid", "network", "usbdisplay", "usbreader"]}
-                            ]
+                            "title": "Device Name",
+                            "default": "Projector",
+                            "description": "Name of the projector as it will appear in HomeKit."
                         },
-                        "label": {
+                        "model": {
                             "type": "string",
-                            "title": "Label for HomeKit",
-                            "description": "How the input will appear in HomeKit."
+                            "title": "Device Model",
+                            "default": "W1070",
+                            "description": "Only displayed in accessory details in HomeKit."
+                        },
+                        "adapter": {
+                            "type": "string",
+                            "title": "Path to Serial Adapter",
+                            "default": "/dev/ttyUSB0",
+                            "description": "File system path to the RS232 serial adapter used to communicate with projector."
+                        },
+                        "inputs": {
+                            "type": "array",
+                            "title": "Input Mapping",
+                            "description": "List of inputs on the projector to expose in HomeKit and what they should be called.",
+                            "items": {
+                                "type": "object",
+                                "title": "Inputs",
+                                "description": "'Input' and 'label' pair where 'input' is the input according to the projector and 'label' is how it will be listed in HomeKit.",
+                                "required": [
+                                    "input",
+                                    "label"
+                                ],
+                                "properties": {
+                                    "input": {
+                                        "type": "string",
+                                        "title": "Projector Input",
+                                        "description": "Input according to the projector.",
+                                        "oneOf": [
+                                            {"enum": ["hdmi", "RGB", "ypbr", "hdmi2", "vid", "svid", "RGB2", "dviA", "dvid", "network", "usbdisplay", "usbreader"]}
+                                        ]
+                                    },
+                                    "label": {
+                                        "type": "string",
+                                        "title": "Label for HomeKit",
+                                        "description": "How the input will appear in HomeKit."
+                                    }
+                                }
+                            },
+                            "default": [
+                                {
+                                "input": "hdmi",
+                                "label": "Apple TV"
+                            },
+                            {
+                                "label": "Computer",
+                                "input": "RGB"
+                            },
+                            {
+                                "input": "ypbr",
+                                "label": "Component"
+                            },
+                            {
+                                "input": "hdmi2",
+                                "label": "Raspberry Pi"
+                            },
+                            {
+                                "input": "vid",
+                                "label": "Composite"
+                            },
+                            {
+                                "label": "S-Video",
+                                "input": "svid"
+                            }]
+                        },
+                        "baudrate": {
+                            "type": "integer",
+                            "title": "Baudrate of Serial Connection",
+                            "description": "Baudrate required for successful serial connection to the projector.",
+                            "default": 115200
+                        },
+                        "pollingInterval": {
+                            "type": "integer",
+                            "title": "Polling Interval",
+                            "description": "Interval in milliseconds at which to poll for status of projector.",
+                            "default": 6000
                         }
                     }
-                },
-                "default": [
-                    {
-                    "input": "hdmi",
-                    "label": "Apple TV"
-                },
-                {
-                    "label": "Computer",
-                    "input": "RGB"
-                },
-                {
-                    "input": "ypbr",
-                    "label": "Component"
-                },
-                {
-                    "input": "hdmi2",
-                    "label": "Raspberry Pi"
-                },
-                {
-                    "input": "vid",
-                    "label": "Composite"
-                },
-                {
-                    "label": "S-Video",
-                    "input": "svid"
-                }]
-            },
-            "baudrate": {
-                "type": "integer",
-                "title": "Baudrate of Serial Connection",
-                "description": "Baudrate required for successful serial connection to the projector.",
-                "default": 115200
-            },
-            "pollingInterval": {
-                "type": "integer",
-                "title": "Polling Interval",
-                "description": "Interval in milliseconds at which to poll for status of projector.",
-                "default": 6000
+                }
             }
         },
         "additionalProperties": false
