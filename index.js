@@ -311,7 +311,7 @@ class BenQProjector {
 
         this.queue.push(cmd);
         if (callback) {
-          callback(null, this.state);
+          callback(null);
         }
     }
 
@@ -335,7 +335,7 @@ class BenQProjector {
         }
         this.queue.push(cmd);
         if (callback) {
-          callback(null, this.mute);
+          callback(null);
         }
     }
 
@@ -368,7 +368,7 @@ class BenQProjector {
             }
         })
         if (callback) {
-            callback(null, this.volume);
+            callback(null);
         }
     }
 
@@ -429,7 +429,7 @@ class BenQProjector {
         this.log("debug", `Sending setPictureMode ${cmd}`);
         this.queue.push(cmd)
         if (callback) {
-            callback(null, this.pictureMode);
+            callback(null);
         }
     }
 
@@ -441,7 +441,8 @@ class BenQProjector {
             this.queue.push(press);
         } else {
             this.log("error", `Remote button ${button} not supported.`)
-            return
+            if(callback) callback(new Error("Remote button not supported"));
+            return;
         }
         if(callback) callback();
     }
