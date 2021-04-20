@@ -251,7 +251,8 @@ class BenQProjector {
 
     async handleVolResponse(response) {
         if (response.indexOf("*VOL=") > -1) {
-            var vol = Number(response.split('=')[1].split('#'));
+            var index = response.lastIndexOf('=');
+            var vol = Number(response.substr(index+1).split('#')[0]);
             this.log("debug", `Volume is: ${vol}`)
             if (vol) {
                 this.volume = vol;
