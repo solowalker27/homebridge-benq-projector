@@ -53,7 +53,8 @@ class BenQProjector {
         this.state = false;
         this.mute = false;
         this.volume = 0;
-        
+        this.pictureMode = Characteristic.PictureMode.OTHER;
+
         this._log = log;
 
         this.enabledServices = [];
@@ -70,7 +71,10 @@ class BenQProjector {
             "Volume State": "\r*vol=?#\r",
             // This purposefully doesn't end in \r as it's added later when this command is used.
             "Source Set": "\r*sour=",
-            "Source Get": "\r*sour=?#\r"
+            "Source Get": "\r*sour=?#\r",
+            // This purposefully doesn't end in \r as it's added later when this command is used.
+            "Picture Mode Set": "\r*appmod=",
+            "Picture Mode Get": "\r*appmod=?#\r"
         };
 
         this.buttons = {
@@ -100,7 +104,18 @@ class BenQProjector {
         // {"input": "network", "label": "Network"},
         // {"input": "usbdisplay", "label": "USB Display"},
         // {"input": "usbreader", "label": "USB Reader"}
-        
+
+        this.pictureModes = config['picturemodes'] || {
+          [Characteristic.PictureMode.OTHER]: "user1",
+          [Characteristic.PictureMode.STANDARD]:	"std",
+          [Characteristic.PictureMode.CALIBRATED]: "cine",
+          [Characteristic.PictureMode.CALIBRATED_DARK]: "isfnight",
+          [Characteristic.PictureMode.VIVID]: "bright",
+          [Characteristic.PictureMode.GAME]: "game",
+          [Characteristic.PictureMode.COMPUTER]: "preset",
+          [Characteristic.PictureMode.CUSTOM]: "user2"
+        };
+
         // Serial command queue
         this.queue = [];
 
@@ -131,13 +146,15 @@ class BenQProjector {
     /////////////////////////////
     // Serial Command Function //
     /////////////////////////////
-    async sendCommands() {
+     async sendCommands() {
         // If the queue gets too big, reduce it by deduplicating it.
         if (this.queue.length > 5) {
             this.queue = [...new Set(this.queue)]
         }
-        
-        this.queue.forEach(async (cmd, index) => {
+        var index, cmd;
+
+        for (index in this.queue) {
+            cmd = this.queue[index];
             this.log("debug", `sendCommand: ${cmd}`);
             var response = await serialio.send(this.adapter, cmd, {baudRate:this.baudrate}).catch(error => {
                     // Don't remove command that failed so it can be run again.
@@ -148,7 +165,7 @@ class BenQProjector {
                 // Error handling
                 if (response.indexOf("Block") > -1) {
                     this.log("debug", "Block in response.")
-                } 
+                }
                 // Response handling
                 if (response.indexOf("*pow=") > -1) {
                     this.handlePowResponse(response);
@@ -162,17 +179,18 @@ class BenQProjector {
                 if (response.indexOf("*vol=") > -1) {
                     this.handleVolResponse(response);
                 }
+                if (response.indexOf("*appmod=") > -1) {
+                    this.handleAppmodResponse(response);
+                }
                 // Remove command that was successfully run.
                 this.queue.splice(index, 1);
             } else {
                 this.log("debug", "Response was undefined")
             }
-            // Try to give serial connection time to reset.
-            setTimeout(()=>1000)
-        })
+        }
     }
 
-    handlePowResponse(response) {
+    async handlePowResponse(response) {
         if (response.indexOf("ON") > -1) {
             this.log("debug", 'Power is On');
             this.state = true;
@@ -187,7 +205,7 @@ class BenQProjector {
             .updateValue(this.state);
     }
 
-    handleSourResponse(response) {
+    async handleSourResponse(response) {
         this.log("debug", `getInput response: ${response}`);
         this.inputs.forEach((i, x) => {
             if (response.toLowerCase().indexOf(i.input.toLowerCase() + "#") > -1) {
@@ -201,7 +219,23 @@ class BenQProjector {
             .updateValue(this.lastKnownSource);
     }
 
-    handleMuteResponse(response) {
+    async handleAppmodResponse(response) {
+        this.log("debug", `getPictureMode response: ${response}`);
+        Object.entries(this.pictureModes).forEach(([x, mode]) => {
+          if (response.toLowerCase().indexOf(mode.toLowerCase() + "#") > -1) {
+                  this.pictureMode = x;
+                  this.log("debug", `Picture Mode is ${mode}`);
+              }
+          });
+          this.log("debug", `Setting PictureMode to: ${this.pictureMode}`);
+          this.tvService
+              .getCharacteristic(Characteristic.PictureMode)
+              .updateValue(this.pictureMode);
+
+
+    }
+
+    async handleMuteResponse(response) {
         if (response.indexOf("ON") > -1) {
             this.log("debug", 'Mute is On');
             this.mute = true;
@@ -215,7 +249,7 @@ class BenQProjector {
             .updateValue(this.mute);
     }
 
-    handleVolResponse(response) {
+    async handleVolResponse(response) {
         if (response.indexOf("*VOL=") > -1) {
             var vol = Number(response.split('=')[1].split('#'));
             this.log("debug", `Volume is: ${vol}`)
@@ -263,14 +297,6 @@ class BenQProjector {
         }
     }
 
-    getPowerState(callback) {
-        this.log("debug", 'Getting power state.');
-        this.queue.push(this.commands['Power State']);
-        if (callback) {
-          callback(null, this.state);
-        }
-    }
-        
     setPowerState(value, callback) {
         this.log("debug", `Set projector power state to ${value}`);
         this.state = value;
@@ -281,13 +307,13 @@ class BenQProjector {
           var cmd = this.commands['Power Off'];
           this.log("info", "Power Off");
         }
-        
+
         this.queue.push(cmd);
         if (callback) {
           callback(null, this.state);
         }
     }
-        
+
     getMuteState(callback) {
         this.log("debug", 'Getting mute state.');
         this.queue.push(this.commands['Mute State']);
@@ -295,7 +321,7 @@ class BenQProjector {
           callback(null, this.mute);
         }
     }
-        
+
     setMuteState(value, callback) {
         this.log("debug", `Set projector mute state to ${value}`);
         this.mute = value;
@@ -311,7 +337,7 @@ class BenQProjector {
           callback(null, this.mute);
         }
     }
-        
+
     getVolume(callback) {
         this.log("debug", 'Getting volume state.')
         this.queue.push(this.commands['Volume State'], {baudRate:this.baudrate})
@@ -356,7 +382,7 @@ class BenQProjector {
         } else {
             that.log.error( "setVolumeRelative - VOLUME : ERROR - unknown direction sent");
         }
-        
+
         this.queue.push(cmd);
         if (callback) {
             callback();
@@ -386,13 +412,23 @@ class BenQProjector {
         }
     }
 
-    getInputSource(callback) {
+    getPictureMode(callback) {
         if (this.state) {
-            this.log("debug", "Getting source");
-            this.queue.push(this.commands['Source Get']);
+            this.log("debug", "Getting picture mode")
+            this.queue.push(this.commands['Picture Mode Get']);
         }
         if (callback) {
-            callback(null, this.lastKnownSource);
+            callback(null, this.pictureMode);
+        }
+    }
+
+    setPictureMode(mode, callback) {
+        this.log("info", `Set projector Picture Mode to ${mode}`);
+        var cmd = this.commands['Picture Mode Set'] + this.pictureModes[mode] + "#\r";
+        this.log("debug", `Sending setPictureMode ${cmd}`);
+        this.queue.push(cmd)
+        if (callback) {
+            callback(null, this.pictureMode);
         }
     }
 
@@ -415,19 +451,6 @@ class BenQProjector {
         if (callback) {
             callback();
         } // turn on
-    }
-
-    remoteKeyPress(button, callback) {
-        this.log("debug", button)
-        if (this.buttons[button]) {
-            var press = this.buttons[button]
-            this.log("info", `Pressing remote key ${button}`);
-                this.queue.push(press);
-        } else {
-            this.log("error", `Remote button ${button} not supported.`)
-            return
-        }
-        if (callback) callback();
     }
 
     addSources(service) {
@@ -509,6 +532,11 @@ class BenQProjector {
             .on('set', (newValue, callback) => {
                 this.remoteKeyPress(Characteristic.RemoteKey.INFORMATION, callback);
             });
+
+        this.tvService
+            .addCharacteristic(Characteristic.PictureMode)
+            .on('set', this.setPictureMode.bind(this))
+            .on('get', this.getPictureMode.bind(this));
 
         this.enabledServices.push(this.tvService);
         this.prepareTvSpeakerService();
