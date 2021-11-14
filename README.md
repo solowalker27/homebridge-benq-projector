@@ -135,9 +135,15 @@ In addition to the config changes, you'll need to move the plugin config from th
 
 
 ## Known issues 
-- As of v1.1.0 there are no known issues.
+- None.
 
 ## Changelog
+v2.1.0
+- Add Picture Mode characteristic. Fix serial port conflicts, callback issues, and possible volume polling issues. Thanks @mlaurijsse!
+
+v2.0.1
+- Update serial-io dependency.
+
 v2.0.0 **BREAKING CHANGE**
 - Converted plugin to a HomeBridge Platform due to HomeKit limitations. In order to use multiple TVs in HomeKit, they need to be exposed as spearate external accessories. This feature is only available to platform plugins.
 
